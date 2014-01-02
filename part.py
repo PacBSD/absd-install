@@ -1,4 +1,4 @@
-import math
+import string
 from geom import geom
 
 def find_cfg(gobj, name):
@@ -8,8 +8,8 @@ def find_cfg(gobj, name):
     return None
 
 class Partition(object):
-    def __init__(self, own, name, by, secs, pty, rty, start, end, idx):
-        self.owner      = owner
+    def __init__(self, own, name, by, secs, pty, rty, start, end, idx, lbl):
+        self.owner      = own
         self.name       = name
         self.bytes_     = by
         self.sectorsize = secs
@@ -18,6 +18,7 @@ class Partition(object):
         self.start      = start
         self.end        = end
         self.index      = idx
+        self.label      = lbl
 
     @staticmethod
     def from_provider(owner, p):
@@ -29,7 +30,8 @@ class Partition(object):
                          find_cfg(p, 'rawtype'),
                          int(find_cfg(p, 'start')),
                          int(find_cfg(p, 'end')),
-                         int(find_cfg(p, 'index')))
+                         int(find_cfg(p, 'index')),
+                         find_cfg(p, 'label'))
 
 class PartitionTable(object):
     def __init__(self, name, scheme, first, last, size, sectorsize):
@@ -101,17 +103,17 @@ def bytes2str(b, d=1):
     suffix = 'b'
     # gpart uses SI units so... not 1024
     for s in ['k', 'M', 'G', 'T' ]:
-        if b < 1000:
+        if b < 1024:
             break
-        b /= 1000
+        b /= 1024
         suffix = s
     return ('%%.%uf%%s' % d) % (b, suffix)
 
 str2byte_sufs = {
-    'k': 1000,
-    'M': 1000*1000,
-    'G': 1000*1000*1000,
-    'T': 1000*1000*1000*1000,
+    'k': 1024,
+    'M': 1024*1024,
+    'G': 1024*1024*1024,
+    'T': 1024*1024*1024*1024,
 }
 def str2bytes(b, d=1):
     """This does not floor the result and allows floating point values."""
@@ -127,35 +129,36 @@ def str2bytes(b, d=1):
             continue
         mul = str2byte_sufs.get(c, 1)
         break
-    return num * mul
+    return int(num) * mul
 
 def delete_partition(p):
-    try:
-        index = p.owner.partitions.index(p)
-    except ValueError:
-        return 'failed to find partition index'
-    return geom_part_do(p.owner.name, 'delete', [('index', int, index)])
+    res = geom.geom_part_do(p.owner.name, 'delete', [('index', int, p.index)])
+    if res is not None:
+        return res
+    p.owner.partitions.remove(p)
+    return None
 
 def create_partition(table, label, start, size, type_):
     data = []
     if len(label) > 0:
-        data.append('label', str, str(label))
+        data.append(('label', str, str(label)))
 
-    ty = geom.partition_type_for(table.scheme, str(type_))
-    if ty is None:
-        return 'invalid type: %s' % type_
-    data.append('type', str, ty)
+    if len(type_):
+        ty = geom.partition_type_for(table.scheme, type_)
+        if ty is None:
+            return 'invalid type: %s' % type_
+        data.append(('type', str, ty))
 
-    start = max(str2bytes(start) // table.sectorsize, table.first)
-    size  = str2bytes(size)  // table.sectorsize
+    start = max(start // table.sectorsize, table.first)
+    size  = (size // table.sectorsize) + 1
 
     if start + size > table.last:
-        size = table.last - start
+        size = table.last - start + 1
 
-    data.append('start', str, str(start))
-    data.append('size',  str, str(size))
+    data.append(('start', str, str(start)))
+    data.append(('size',  str, str(size)))
 
-    return geom_part_do(table.name, 'add', data)
+    return geom.geom_part_do(table.name, 'add', data)
 
 
 __all__ = ['find_cfg',
@@ -165,4 +168,6 @@ __all__ = ['find_cfg',
            'info',
            'bytes2str',
            'str2bytes',
+           'create_partition',
+           'delete_partition',
           ]

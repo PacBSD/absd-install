@@ -45,7 +45,7 @@ class GConfig(Structure):
         if self.lg_val is not None:
             return self.lg_val.decode('utf-8')
         else:
-            return '(null)'
+            return None
 
     @property
     def val(self):
@@ -233,17 +233,6 @@ geom_functions = (
     ("g_mediasize",     off_t,      [c_int]),
 )
 
-def gctl_param(req, param, ty, value):
-    key = create_string_buffer(param.encode('utf-8'))
-    if ty == int:
-        v = c_long(value)
-        lib.gctl_ro_param(req, key, sizeof(c_long), byref(v))
-    elif ty == str:
-        v = create_string_buffer(value.encode('utf-8'))
-        lib.gctl_ro_param(req, key, -1, cast(v, c_void_p))
-    else:
-        raise ValueError
-
 def load_functions(lib, lst):
     def register(fn):
         func = getattr(lib, fn[0], None)
@@ -301,15 +290,29 @@ def partition_type_for(scheme, ty):
             return 'freebsd'
     return ty
 
+def gctl_param(req, param, ty, value):
+    key = create_string_buffer(param.encode('utf-8'))
+    if ty == int:
+        v = c_long(value)
+        lib.gctl_ro_param(req, key, sizeof(c_long), byref(v))
+        return v
+    elif ty == str:
+        v = create_string_buffer(value.encode('utf-8'))
+        lib.gctl_ro_param(req, key, sizeof(v), cast(v, c_void_p))
+        return v
+    else:
+        raise ValueError
+
 def geom_part_do(provider, verb, data):
     req = lib.gctl_get_handle()
-    gctl_param(req, 'class', str, 'PART')
-    gctl_param(req, 'arg0',  str, provider)
-    gctl_param(req, 'verb',  str, 'delete')
+    keeparound = [gctl_param(req, 'class', str, 'PART'),
+                  gctl_param(req, 'verb',  str, verb),
+                  gctl_param(req, 'arg0',  str, provider)
+                 ]
     for k,t,v in data:
-        gctl_param(req, k, t, v)
+        keeparound.append(gctl_param(req, k, t, v))
     err = lib.gctl_issue(req)
-    geom.lib.gctl_free(req)
+    lib.gctl_free(req)
     return err
 
 __all__ = [
@@ -323,5 +326,7 @@ __all__ = [
     'lib',
     'GeomException',
     'Mesh',
+    'partition_type_for',
+    'geom_part_do',
     'gctl_param',
 ]
