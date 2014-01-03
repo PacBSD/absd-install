@@ -2,6 +2,7 @@
 
 import part
 import utils
+import i_parted
 from geom import geom
 
 import os
@@ -37,6 +38,12 @@ def main():
     # fstab entries...
     Main.fstab       = []
 
+    # callbacks
+    Main.draw_gui      = draw_gui
+    Main.resize_event  = resize_event
+    Main.translate_key = translate_key
+    Main.get_key       = get_key
+
     # which geoms are currently open in the tree view
     Main.tables_open   = []
     Main.tables_scroll = 0
@@ -44,11 +51,6 @@ def main():
     Main.tables_count  = 0
     Main.status_msg    = "Create/Select partitions to install on."
     Main.tables_sel    = None
-
-    Main.draw_gui      = draw_gui
-    Main.resize_event  = resize_event
-    Main.translate_key = translate_key
-    Main.get_key       = get_key
 
     show_gui()
 
@@ -237,23 +239,25 @@ def partition_action():
 
         partype = geom.partition_type_for(table.scheme, 'freebsd-ufs')
 
-        dlg = utils.Dialog(Main, "New Partition",
-            (('label', str,        '',      None),
-             ('start', utils.Size, start,   (0, end-start)),
-             ('size',  utils.Size, size,    (0, end-start)),
-             ('type',  str,        partype, None)))
-        result = dlg.run()
-        if result is not None:
-            label, ustart, usize, ty = result
-            bstart = part.str2bytes(ustart[2])
-            bsize  = part.str2bytes(usize[2])
-            if bstart < start:
-                bstart = start
-            if bsize > (end-start):
-                bsize = (end-start)
-            Main.status_msg = part.create_partition(table, label[2], bstart,
-                                                    bsize, ty[2])
-        draw_gui()
+        with utils.Dialog(Main, "New Partition",
+                          (('label', str,        '',      None),
+                           ('start', utils.Size, start,   (0, end-start)),
+                           ('size',  utils.Size, size,    (0, end-start)),
+                           ('type',  str,        partype, None)
+                          )) as dlg:
+            result = dlg.run()
+            if result is not None:
+                label, ustart, usize, ty = result
+                bstart = part.str2bytes(ustart[2])
+                bsize  = part.str2bytes(usize[2])
+                if bstart < start:
+                    bstart = start
+                if bsize > (end-start):
+                    bsize = (end-start)
+                msg = part.create_partition(table, label[2], bstart, bsize,
+                                            ty[2])
+                Main.status_msg = msg
+            draw_gui()
     else:
         Main.status_msg = "(nothing to do)"
         draw_gui()
@@ -307,7 +311,10 @@ def event_loop():
 
 def show_gui():
     try:
-        event_loop()
+        #event_loop()
+        Main.screen.refresh()
+        with i_parted.Parted(Main) as parted:
+            parted.run()
     except KeyboardInterrupt:
         pass
     except Exception as inst:
