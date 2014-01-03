@@ -72,7 +72,7 @@ class Window(object):
         if name == b'q':
             return False
         elif key == curses.KEY_RESIZE:
-            self.Main.resize_event(do_refresh=False)
+            self.Main.resize_event()
             self.resize()
             self.draw()
         elif name == b'^I':
@@ -209,18 +209,6 @@ class Dialog(Window):
                 value = value[0:self.cursor] + ch + value[self.cursor:]
                 self.fields[self.current] = (title, type_, value, limit)
                 self.cursor += 1
-            #elif ch in string.digits:
-            #    value = value[0:self.cursor] + ch + value[self.cursor:]
-            #    self.fields[self.current] = (title, type_, value, limit)
-            #    self.cursor += 1
-            #elif ch == '-' or ch == '_' or ch in string.ascii_letters:
-            #    if type_ == str or (type_ == Size and
-            #        value = value[0:self.cursor] + ch + value[self.cursor:]
-            #        self.fields[self.current] = (title, type_, value, limit)
-            #        self.cursor += 1
-            else:
-                self.Main.status_msg = 'key %s : %s' % (key, name)
-                self.Main.draw_gui()
             self.draw()
         return True
 

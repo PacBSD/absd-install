@@ -134,8 +134,13 @@ class Parted(Window):
         height -= 2
         if self.tab_pos < self.tab_scroll:
             self.tab_scroll = self.tab_pos
-        elif self.tab_scroll < self.tab_pos - height +1:
-            self.tab_scroll = self.tab_pos - height +1
+        elif self.tab_scroll < self.tab_pos - height + 1:
+            self.tab_scroll =  self.tab_pos - height + 1
+
+        if self.tab_scroll > 0:
+            win.addstr(0,        width - 16, ' [ ^^^ more ] ')
+        if self.tab_scroll + height < count:
+            win.addstr(height+1, width - 16, ' [ vvv more ] ')
 
         x = 1
         y = 1
@@ -154,3 +159,55 @@ class Parted(Window):
             eindex += 1
             y      += 1
         win.refresh()
+
+def partition_action():
+    if Main.tables_sel is None:
+        return
+    (text, entry) = Main.tables_sel
+    if entry[0] == EntryType.Table:
+        Main.status_msg = "Partition Table actions not implemented"
+        draw_gui()
+    elif entry[0] == EntryType.Partition:
+        (_, table, partition) = entry
+        with utils.YesNo(Main, "Delete Partition",
+                         "Do you want to delete partition %s?" % partition.name
+                        ) as dlg:
+            dlg.current = 1
+            res = dlg.run()
+            if res:
+                Main.status_msg = part.delete_partition(partition)
+            draw_gui()
+    elif entry[0] == EntryType.Free:
+        (_, table, start, size) = entry
+
+        #start = start * table.sectorsize
+        #end   = start + size * table.sectorsize
+        end    = start + size
+        start *= table.sectorsize
+        end   *= table.sectorsize
+        size   = str(end - start)
+
+        partype = geom.partition_type_for(table.scheme, 'freebsd-ufs')
+
+        with utils.Dialog(Main, "New Partition",
+                          (('label', str,        '',      None),
+                           ('start', utils.Size, start,   (0, end-start)),
+                           ('size',  utils.Size, size,    (0, end-start)),
+                           ('type',  str,        partype, None)
+                          )) as dlg:
+            result = dlg.run()
+            if result is not None:
+                label, ustart, usize, ty = result
+                bstart = part.str2bytes(ustart[2])
+                bsize  = part.str2bytes(usize[2])
+                if bstart < start:
+                    bstart = start
+                if bsize > (end-start):
+                    bsize = (end-start)
+                msg = part.create_partition(table, label[2], bstart, bsize,
+                                            ty[2])
+                Main.status_msg = msg
+            draw_gui()
+    else:
+        Main.status_msg = "(nothing to do)"
+        draw_gui()
