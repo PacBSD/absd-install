@@ -18,6 +18,7 @@ class Installer(object):
     def __init__(self):
         self.home        = os.environ['HOME']
         self.config_file = self.home + '/absd-installer.json'
+        self.yank_buf    = ''
 
         self.fstab = []
 
@@ -35,6 +36,12 @@ class Installer(object):
         with open(self.config_file, 'w', encoding='utf-8') as f:
             json.dump(self.data, f, sort_keys=True,
                       indent=4, separators=(',', ':'))
+
+    def yank_add(self, text):
+        # we might add a cut/paste history at some point
+        self.yank_buf = text
+    def yank_get(self):
+        return self.yank_buf
 
     def main(self):
         def exit_hook():

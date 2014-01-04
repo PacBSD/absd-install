@@ -272,10 +272,10 @@ class Parted(Window):
             size  *= table.sectorsize
             partype = geom.partition_type_for(table.scheme, 'freebsd-ufs')
             with utils.Dialog(self.Main, L('New Partition'),
-                              (('label', str,        '',      None),
-                               ('start', utils.Size, start,   (0, size)),
-                               ('size',  utils.Size, size,    (minsz, size)),
-                               ('type',  str,        partype, None)
+                              (('label', utils.Label, '',      None),
+                               ('start', utils.Size,  start,   (0, size)),
+                               ('size',  utils.Size,  size,    (minsz, size)),
+                               ('type',  str,         partype, None)
                               )) as dlg:
                 result = dlg.run()
                 if result is None:

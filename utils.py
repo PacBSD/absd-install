@@ -8,6 +8,9 @@ L = gettext.gettext
 class Size:
     pass
 
+class Label:
+    pass
+
 def check_field(label, type_, value, allowed):
     if allowed is None:
         return (label, type_, value, allowed)
@@ -21,12 +24,19 @@ def check_field(label, type_, value, allowed):
 
 def is_valid_char(ch, text, position, type_):
     if type_ == str:
-        return True
+        return ch in string.printable
+
+    if type_ == Label:
+        return (ch in string.ascii_letters or
+                ch in string.digits        or
+                ch in '_-')
+
     if type_ == int:
         # 0x prefix allowed:
         if len(text) > 1 and text[0] == '0' and position == 1 and ch == 'x':
             return True
         return ch in string.digits
+
     if type_ == Size:
         # 0x prefix allowed:
         if len(text) > 1 and text[0] == '0' and position == 1 and ch == 'x':
@@ -37,6 +47,7 @@ def is_valid_char(ch, text, position, type_):
         if position == len(text) and ch in 'kMGT':
             return True
         return ch in string.digits
+
     return False
 
 def translate_key(key):
@@ -89,6 +100,15 @@ def isk_backspace(key, name):
 
 def isk_del(key, name):
     return key == curses.KEY_DC or name == b'^D'
+
+def isk_del_to_front(key, name):
+    return name == b'^U'
+
+def isk_del_to_end(key, name):
+    return name == b'^K'
+
+def isk_yank(key, name):
+    return name == b'^Y'
 
 class Window(object):
     def __init__(self, Main):
@@ -283,31 +303,62 @@ class Dialog(Window):
         elif self.current < len(self.fields):
             title, type_, value, limit = self.fields[self.current]
             ch = chr(key)
-            if isk_left(key, name):
+
+            if is_valid_char(ch, value, self.cursor, type_):
+                # typing
+                value = value[0:self.cursor] + ch + value[self.cursor:]
+                self.fields[self.current] = (title, type_, value, limit)
+                self.cursor += 1
+
+            elif isk_left(key, name):
+                # move left
                 self.cursor = max(0, self.cursor-1)
             elif isk_right(key, name):
+                # move right
                 self.cursor += 1
                 self.cursor = min(self.cursor,
                                   len(self.fields[self.current][2]))
             elif isk_backspace(key, name):
+                # backspace
                 if self.cursor > 0:
                     value = value[0:self.cursor-1] + value[self.cursor:]
                     self.fields[self.current] = (title, type_, value, limit)
                     self.cursor -= 1
+
             elif isk_del(key, name):
+                # delete
                 if self.cursor < len(self.fields[self.current][2]):
                     value = value[0:self.cursor] + value[self.cursor+1:]
                     self.fields[self.current] = (title, type_, value, limit)
+
             elif isk_home(key, name):
+                # home
                 self.cursor = 0
+
             elif isk_end(key, name):
+                # end
                 self.cursor = len(self.fields[self.current][2])
-            elif (ch in string.printable and 
-                  is_valid_char(ch, value, self.cursor, type_)
-                 ):
-                value = value[0:self.cursor] + ch + value[self.cursor:]
+
+            elif isk_del_to_front(key, name):
+                # delete to the beginning of the line
+                self.Main.yank_add(value[:self.cursor])
+                value = value[self.cursor:]
                 self.fields[self.current] = (title, type_, value, limit)
-                self.cursor += 1
+                self.cursor = 0
+
+            elif isk_del_to_end(key, name):
+                # delete to the beginning of the line
+                self.Main.yank_add(value[self.cursor:])
+                value = value[:self.cursor]
+                self.fields[self.current] = (title, type_, value, limit)
+
+            elif isk_yank(key, name):
+                # paste from the yank buffer
+                inner = self.Main.yank_get()
+                value = value[0:self.cursor] + inner + value[self.cursor:]
+                self.cursor += len(inner)
+                self.fields[self.current] = (title, type_, value, limit)
+
             self.draw()
         return True
 
