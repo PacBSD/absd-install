@@ -311,7 +311,7 @@ def geom_part_do(provider, verb, data):
     keeparound = [gctl_param(req, 'class', str, 'PART'),
                   gctl_param(req, 'verb',  str, verb),
                   gctl_param(req, 'arg0',  str, provider),
-                  gctl_param(req, 'flags', str, '') # explicitly no 'C'
+                  gctl_param(req, 'flags', str, 'x') # don't commit immediately
                  ]
     for k,t,v in data:
         keeparound.append(gctl_param(req, k, t, v))
