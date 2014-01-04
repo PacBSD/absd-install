@@ -1,6 +1,8 @@
 from ctypes import *
 import atexit
 
+from . import util
+
 class GeomException(Exception):
     pass
 
@@ -217,7 +219,7 @@ GProvider._fields_ = [("lg_id",           c_void_p),
 
 GReqPtr = POINTER(c_void_p)
 
-geom_functions = (
+geom_functions = [
     ("gctl_get_handle", GReqPtr,    None),
     ("gctl_issue",      c_char_p,   [GReqPtr]),
     ("gctl_ro_param",   None,       [GReqPtr, c_char_p, c_int, c_void_p]),
@@ -232,24 +234,12 @@ geom_functions = (
     ("g_open",          c_int,      [c_char_p, c_int]),
     ("g_close",         None,       [c_int]),
     ("g_mediasize",     off_t,      [c_int]),
-)
+]
 
-def load_functions(lib, lst):
-    def register(fn):
-        func = getattr(lib, fn[0], None)
-        if func is None:
-            raise Exception('failed to find function %s' % fn[0])
-
-        func.restype  = fn[1]
-        func.argtypes = fn[2]
-
-    for i in lst:
-        register(i)
-
-lib = CDLL('libgeom.so.5')
+lib = CDLL('libgeom.so.5', mode=RTLD_GLOBAL)
 if lib is None:
     raise Exception('failed to open libgeom.so.5')
-load_functions(lib, geom_functions)
+util.load_functions(lib, geom_functions)
 
 class Mesh(object):
     def __init__(self):

@@ -1,1 +1,1 @@
-__all__ = [ 'geom' ]
+__all__ = [ 'geom', 'zfs' ]
