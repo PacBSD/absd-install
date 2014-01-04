@@ -2,6 +2,9 @@ import curses
 import string
 from curses.textpad import Textbox, rectangle
 
+import gettext
+L = gettext.gettext
+
 class Size:
     pass
 
@@ -144,25 +147,60 @@ class Window(object):
     def resize(self):
         pass
 
+def YesNo(Main, title, question):
+    with MsgBox(Main, title, question) as dlg:
+        return dlg.run() == MsgBox.Yes
 
-class YesNo(Window):
-    def __init__(self, Main, title, question):
+def Message(Main, title, text):
+    with MsgBox(Main, title, text, buttons=[MsgBox.Ok]) as dlg:
+        dlg.run()
+
+def Confirm(Main, title, question):
+    with MsgBox(Main, title, question,
+                buttons=[MsgBox.Ok, MsgBox.Cancel]
+               ) as dlg:
+        return dlg.run() == MsgBox.Ok
+
+class MsgBox(Window):
+    Yes    = (0, L("Yes"))
+    No     = (1, L("No"))
+    Ok     = (2, L("OK"))
+    Cancel = (3, L("Cancel"))
+
+    def __init__(self, Main, title, question, buttons=[Yes, No]):
         Window.__init__(self, Main)
         self.title    = title
         self.question = question
-        self.result   = False
-        self.tabcount = 2
+        self.buttons  = buttons
+        self.tabcount = len(buttons)
+        self.result   = buttons[0]
         self.resize()
+
+    def select(self, rel):
+        self.current += rel
+        if self.current < 0:
+            self.current = self.tabcount-1
+        elif self.current >= self.tabcount:
+            self.current = 0
+        self.draw()
 
     def event(self, key, name):
         if isk_enter(key, name):
-            self.result = (self.current == 0)
+            self.result = self.buttons[self.current]
             return False
+        elif key == b'q':
+            self.result = None
+            return False
+        elif isk_left(key, name):
+            self.select(-1)
+        elif isk_right(key, name):
+            self.select(1)
+
         return True
 
     def resize(self):
         Main = self.Main
-        self.fullw = len(self.question) + 4
+        self.fullw = max(40, len(self.question) + 4)
         self.fullh = 6
 
         self.width  = self.fullw - 2
@@ -193,16 +231,13 @@ class YesNo(Window):
         win.hline (y+2, 1, ' ', width)
 
         x = 1
-        # OK button
-        attr = curses.A_REVERSE if self.current == 0 else curses.A_NORMAL
-        rectangle(win, y, x, y+2, x+8)
-        win.addstr(y+1, x+1, '  YES  ', attr)
+        for i in range(self.tabcount):
+            attr = curses.A_REVERSE if self.current == i else curses.A_NORMAL
+            text = self.buttons[i][1]
+            rectangle(win, y, x, y+2, x+len(text)+1)
+            win.addstr(y+1, x+1, text, attr)
+            x += len(text)+3
 
-        attr = curses.A_REVERSE if self.current == 1 else curses.A_NORMAL
-        x += 9
-        # CANCEL button
-        rectangle(win, y, x, y+2, x+9)
-        win.addstr(y+1, x+1, '   NO   ', attr)
         win.refresh()
 
 class Dialog(Window):

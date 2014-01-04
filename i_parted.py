@@ -6,7 +6,6 @@ import curses
 from curses.textpad import Textbox, rectangle
 
 import gettext
-
 L = gettext.gettext
 
 class EntryType:
@@ -255,6 +254,16 @@ class Parted(Window):
             return
 
         ent = self.tab_entries[self.tab_pos]
+        if ent[0] == EntryType.Free:
+            self.action_free(ent[1], ent[2], ent[3])
+        elif ent[0] == EntryType.Partition:
+            self.action_part(ent[1], ent[2])
+
+    def action_free(self, table, start, size):
+        self.draw()
+
+    def action_part(self, table, part):
+        self.draw()
 
 def partition_action():
     if Main.tables_sel is None:
