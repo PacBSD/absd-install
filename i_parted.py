@@ -292,6 +292,7 @@ class Parted(Window):
                     utils.Message(self.Main, "Error", msg)
                 else:
                     self.load()
+            delf.draw()
 
 
     def action_part(self, table, part):
