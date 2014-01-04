@@ -333,16 +333,21 @@ class Parted(Window):
 
         self.draw()
 
-    def delete_partition(self, part):
+    def unuse(self, partname):
         try:
-            del self.Main.fstab[part.name]
+            del self.Main.fstab[partname]
         except:
             pass
+
+    def delete_partition(self, part):
+        self.unuse(part.name)
         msg = part.delete_partition(p)
         if msg is not None:
             return msg
 
     def set_mountpoint(self, part, point):
+        if point is None or len(point) == 0:
+            return self.unuse(part.name)
         self.Main.fstab[part.name] = {
             'mount': point
         }
