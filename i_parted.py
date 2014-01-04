@@ -23,7 +23,7 @@ class ActionEnum:
     def get(self):
         return self.list_
 
-TableEntry     = ActionEnum(None, [('None',   L("Choose Partition"))])
+TableEntry     = ActionEnum(None, [('Delete', L("Destroy Partition Table"))])
 PartitionEntry = ActionEnum(0,    [('Use',    L("Use")),
                                    ('Unuse',  L("Do not use")),
                                    ('Delete', L("Delete Partition")),
@@ -270,6 +270,21 @@ class Parted(Window):
             self.action_part(ent[1], ent[2])
         elif ent[0] == EmptyEntry:
             self.action_empty(ent[1])
+        elif ent[0] == TableEntry:
+            self.action_table(ent[1])
+
+    def action_table(self, table):
+        if self.act_pos == TableEntry.Delete:
+            text = ((L("Do you want to destroy %s?\n") % table.name)
+                   + L("WARNING: THIS OPERATION CANNOT BE UNDONE!")
+                   )
+            if utils.NoYes(self.Main, L("Destroy Table?"), text):
+                msg = part.destroy_partition_table(table)
+                if msg is not None:
+                    utils.Message(self.Main, L("Error"), msg)
+                else:
+                    self.load()
+            self.draw()
 
     def action_empty(self, provider):
         if self.act_pos == EmptyEntry.New:

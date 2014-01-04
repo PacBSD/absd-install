@@ -186,6 +186,11 @@ def create_partition_table(provider, scheme):
     data = [('scheme', str, scheme)]
     return geom.geom_part_do(provider.name, 'create', data)
 
+def destroy_partition_table(table):
+    if len(table.partitions):
+        return "Disk is not empty, remove partitions first!"
+    return geom.geom_part_do(table.name, 'destroy', [])
+
 __all__ = ['find_cfg',
            'Partition',
            'PartitionTable',
@@ -196,4 +201,5 @@ __all__ = ['find_cfg',
            'create_partition',
            'delete_partition',
            'create_partition_table',
+           'destroy_partition_table',
           ]
