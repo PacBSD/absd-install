@@ -294,13 +294,13 @@ class Parted(Window):
                     self.load()
             delf.draw()
 
-    def action_part(self, table, part):
+    def action_part(self, table, p):
         if self.act_pos == PartitionActions.Delete:
-            text = ((L("Do you want to delete partition %s?\n") % part.name)
+            text = ((L("Do you want to delete partition %s?\n") % p.name)
                    + L("WARNING: THIS OPERATION CANNOT BE UNDONE!")
                    )
             if utils.YesNo(self.Main, "Delete Partition?", text):
-                msg = part.delete_partition(part)
+                msg = part.delete_partition(p)
                 if msg is not None:
                     utils.Message(self.Main, L("Error"), msg)
             self.draw()
