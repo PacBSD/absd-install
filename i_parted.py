@@ -14,10 +14,14 @@ Window = utils.Window
 class Parted(Window):
     def __init__(self, Main):
         Window.__init__(self, Main)
+        self.notab = True
 
         self.Main       = Main
         self.tab_pos    = 0
         self.tab_scroll = 0
+
+        self.act_pos    = None
+        self.actions    = [ '' ]
 
         self.load()
         self.resize()
@@ -49,33 +53,59 @@ class Parted(Window):
         self.tables      = part.load()
         self.tab_entries = [i for i in self.iterate()]
         self.tab_pos     = min(self.tab_pos, len(self.tab_entries)-1)
+        self.set_actions()
+
+    def set_actions(self):
+        ent          = self.tab_entries[self.tab_pos]
+        if ent[0] == EntryType.Table:
+            self.act_pos = None
+            self.actions = ['(Choose Partition)']
+        elif ent[0] == EntryType.Partition:
+            self.act_pos = 0
+            self.actions = ['[Select]', '[Delete]']
+        elif ent[0] == EntryType.Free:
+            self.act_pos = 0
+            self.actions = ['[Create Partition]']
+        else:
+            raise Exception('invalid table entry type')
+
+    def select_action(self, relative):
+        if self.act_pos is None:
+            return
+        self.act_pos += relative
+        self.act_pos = max(0, min(len(self.actions)-1, self.act_pos))
+        self.draw()
+
+    def selection_changed(self):
+        self.set_actions()
+        self.draw()
 
     def event(self, key, name):
         maxpos = len(self.tab_entries)-1
         if utils.isk_down(key, name):
             # Down
             self.tab_pos = min(self.tab_pos+1, maxpos)
-            self.draw()
+            self.selection_changed()
         elif utils.isk_up(key, name):
             # Up
             self.tab_pos = max(self.tab_pos-1, 0)
-            self.draw()
+            self.selection_changed()
         elif utils.isk_home(key, name):
             # Top:
             self.tab_pos = 0
-            self.draw()
+            self.selection_changed()
         elif utils.isk_end(key, name):
             # Bottom:
             self.tab_pos = maxpos
-            self.draw()
+            self.selection_changed()
         elif utils.isk_scrolldown(key, name):
             # scroll down
             self.tab_scroll = min(self.tab_scroll+1, maxpos)
-            self.draw()
+            self.selection_changed()
         elif utils.isk_scrollup(key, name):
             # scroll up
             self.tab_scroll = max(self.tab_scroll-1, 0)
-            self.draw()
+            self.selection_changed()
         elif utils.isk_pagedown(key, name):
             # page down
             if self.tab_pos != self.tab_scroll + self.height - 3:
@@ -83,7 +113,7 @@ class Parted(Window):
             else:
                 self.tab_pos += self.height-3
             self.tab_pos = min(maxpos, max(0, self.tab_pos))
-            self.draw()
+            self.selection_changed()
         elif utils.isk_pageup(key, name):
             # page up
             if self.tab_pos != self.tab_scroll:
@@ -91,7 +121,15 @@ class Parted(Window):
             else:
                 self.tab_pos -= self.height-3
             self.tab_pos = min(maxpos, max(0, self.tab_pos))
-            self.draw()
+            self.selection_changed()
+        elif utils.isk_tab(key, name) or utils.isk_right(key, name):
+            # tab/right: select next action
+            self.select_action(1)
+        elif utils.isk_left(key, name):
+            # left / previous action
+            self.select_action(-1)
+        else:
+            raise Exception(' (%s) (%s) ' % (key, name))
         return True
 
     @staticmethod
@@ -131,7 +169,18 @@ class Parted(Window):
         rectangle(win, 0, 0, height-1, width)
         win.addstr(0, 3, '[Partitioning]')
 
+        # -2 for the rectangle borders
         height -= 2
+
+        # -1 for the action line
+        act_line = height
+        height -= 1
+        win.hline(height,     1, curses.ACS_HLINE, width-1)
+        win.addch(height,     0, curses.ACS_LTEE)
+        win.addch(height, width, curses.ACS_RTEE)
+        # -1 for the action line's border
+        height -= 1
+
         if self.tab_pos < self.tab_scroll:
             self.tab_scroll = self.tab_pos
         elif self.tab_scroll < self.tab_pos - height + 1:
@@ -158,7 +207,21 @@ class Parted(Window):
             win.addstr(y, x, txt, attr)
             eindex += 1
             y      += 1
+
+        # show the action line...
+        x = 2
+        y = act_line
+        for i in range(len(self.actions)):
+            a = self.actions[i]
+            if i == self.act_pos:
+                attr = curses.A_REVERSE
+            else:
+                attr = curses.A_NORMAL
+            win.addstr(y, x, a, attr)
+            x += len(a) + 2
+
         win.refresh()
+
 
 def partition_action():
     if Main.tables_sel is None:

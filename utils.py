@@ -94,6 +94,7 @@ class Window(object):
         self.current  = 0
         self.tabcount = 0
         self.win      = curses.newwin(5, 5)
+        self.notab    = False
 
     def run(self):
         self.resize()
@@ -126,7 +127,7 @@ class Window(object):
             self.Main.resize_event()
             self.resize()
             self.draw()
-        elif isk_tab(key, name):
+        elif not self.notab and isk_tab(key, name):
             self.current += 1
             if self.current >= self.tabcount:
                 self.current = 0
