@@ -303,7 +303,7 @@ class Parted(Window):
             self.draw()
 
     def action_free(self, table, start, size):
-        if self.act_pos == FreeActions.New:
+        if self.act_pos == FreeEntry.New:
             minsz  = table.sectorsize
             start *= table.sectorsize
             size  *= table.sectorsize
@@ -334,7 +334,7 @@ class Parted(Window):
             self.draw()
 
     def action_part(self, table, p):
-        if self.act_pos == PartitionActions.Delete:
+        if self.act_pos == PartitionEntry.Delete:
             text = ((L("Do you want to delete partition %s?\n") % p.name)
                    + L("WARNING: THIS OPERATION CANNOT BE UNDONE!")
                    )
@@ -345,7 +345,7 @@ class Parted(Window):
                 else:
                     self.load()
 
-        elif self.act_pos == PartitionActions.Use:
+        elif self.act_pos == PartitionEntry.Use:
             point = self.suggest_mountpoint(p)
             with utils.Dialog(self.Main, L('Use Partition %s') % p.name,
                               [('Mountpoint', str, point, None)]
@@ -358,7 +358,7 @@ class Parted(Window):
 
                 self.set_mountpoint(p, result[0][2])
 
-        elif self.act_pos == PartitionActions.Unuse:
+        elif self.act_pos == PartitionEntry.Unuse:
             usage = self.used_as(p)
             if usage is None:
                 return
