@@ -294,7 +294,7 @@ class Parted(Window):
                     utils.Message(self.Main, L("Error"), msg)
                 else:
                     self.load()
-            delf.draw()
+            self.draw()
 
     def action_part(self, table, p):
         if self.act_pos == PartitionActions.Delete:
