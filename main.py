@@ -34,6 +34,8 @@ class Installer(object):
                 self.bootcode = data['bootcode']
         except (FileNotFoundError, PermissionError) as inst:
             print(inst)
+        except ValueError:
+            print("Error in old ~/absd-installer.json file")
 
     def save(self):
         data = {
@@ -41,8 +43,9 @@ class Installer(object):
             'bootcode': self.bootcode,
         }
         with open(self.config_file, 'w', encoding='utf-8') as f:
-            json.dump(self.data, f, sort_keys=True,
+            json.dump(data, f, sort_keys=True,
                       indent=4, separators=(',', ':'))
+            f.write('\n')
 
     def yank_add(self, text):
         # we might add a cut/paste history at some point
@@ -65,6 +68,7 @@ class Installer(object):
             self.run()
             atexit.unregister(exit_hook)
             exit_hook()
+            self.save()
         except KeyboardInterrupt:
             pass
         except Exception as inst:
