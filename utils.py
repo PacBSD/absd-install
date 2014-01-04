@@ -106,7 +106,7 @@ class Window(object):
             while self.event_p(*self.Main.get_key()):
                 pass
         except KeyboardInterrupt:
-            pass
+            self.result = None
         return self.result
 
     def __enter__(self):
@@ -124,9 +124,7 @@ class Window(object):
         self.close()
 
     def event_p(self, key, name):
-        if name == b'q':
-            return False
-        elif key == curses.KEY_RESIZE:
+        if key == curses.KEY_RESIZE:
             self.Main.resize_event()
             self.resize()
             self.draw()
@@ -276,6 +274,9 @@ class Dialog(Window):
             self.tabbed()
             self.draw()
             return True
+        elif key == b'q':
+            self.result = None
+            return False
         elif self.current < len(self.fields):
             title, type_, value, limit = self.fields[self.current]
             ch = chr(key)
