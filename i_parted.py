@@ -303,4 +303,6 @@ class Parted(Window):
                 msg = part.delete_partition(p)
                 if msg is not None:
                     utils.Message(self.Main, L("Error"), msg)
+                else:
+                    self.load()
             self.draw()
