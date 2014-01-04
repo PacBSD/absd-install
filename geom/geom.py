@@ -1,4 +1,5 @@
 from ctypes import *
+import atexit
 
 class GeomException(Exception):
     pass
@@ -303,17 +304,60 @@ def gctl_param(req, param, ty, value):
     else:
         raise ValueError
 
+Uncommitted = []
+
 def geom_part_do(provider, verb, data):
     req = lib.gctl_get_handle()
     keeparound = [gctl_param(req, 'class', str, 'PART'),
                   gctl_param(req, 'verb',  str, verb),
-                  gctl_param(req, 'arg0',  str, provider)
+                  gctl_param(req, 'arg0',  str, provider),
+                  gctl_param(req, 'flags', str, '') # explicitly no 'C'
                  ]
     for k,t,v in data:
         keeparound.append(gctl_param(req, k, t, v))
     err = lib.gctl_issue(req)
     lib.gctl_free(req)
+    if err is None and provider not in Uncommitted:
+        Uncommitted.append(provider)
     return err
+
+def geom_part_commit(provider):
+    if provider not in Uncommitted:
+        return None
+    req = lib.gctl_get_handle()
+    keeparound = [gctl_param(req, 'class', str, 'PART'),
+                  gctl_param(req, 'verb',  str, 'commit'),
+                  gctl_param(req, 'arg0',  str, provider)
+                 ]
+    err = lib.gctl_issue(req)
+    lib.gctl_free(req)
+    if err is None:
+        Uncommitted.remove(provider)
+    return err
+
+def geom_part_undo(provider):
+    if provider not in Uncommitted:
+        return None
+    req = lib.gctl_get_handle()
+    keeparound = [gctl_param(req, 'class', str, 'PART'),
+                  gctl_param(req, 'verb',  str, 'undo'),
+                  gctl_param(req, 'arg0',  str, provider)
+                 ]
+    err = lib.gctl_issue(req)
+    lib.gctl_free(req)
+    if err is None:
+        Uncommitted.remove(provider)
+    return err
+
+def geom_commit_all():
+    while len(Uncommitted):
+        geom_part_commit(Uncommitted[0])
+
+def geom_undo_all():
+    while len(Uncommitted):
+        geom_part_undo(Uncommitted[0])
+
+atexit.register(geom_undo_all)
 
 __all__ = [
     'GIdent',
@@ -328,5 +372,7 @@ __all__ = [
     'Mesh',
     'partition_type_for',
     'geom_part_do',
+    'geom_part_commit',
+    'geom_part_undo',
     'gctl_param',
 ]

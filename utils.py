@@ -114,6 +114,7 @@ class Window(object):
 
     def close(self):
         if self.win is not None:
+            self.before_close()
             del self.win
             self.win = None
 
@@ -138,6 +139,8 @@ class Window(object):
             return self.event(key, name)
         return True
 
+    def before_close(self):
+        pass
     def tabbed(self):
         pass
     def draw(self):

@@ -112,7 +112,9 @@ class Parted(Window):
 
     def event(self, key, name):
         maxpos = len(self.tab_entries)-1
-        if utils.isk_down(key, name):
+        if name == b'q':
+            return False
+        elif utils.isk_down(key, name):
             # Down
             self.tab_pos = min(self.tab_pos+1, maxpos)
             self.selection_changed()
@@ -306,3 +308,11 @@ class Parted(Window):
                 else:
                     self.load()
             self.draw()
+
+    def before_close(self):
+        if len(geom.Uncommitted):
+            msg = L(
+"Do you want to commit your changes to the following disks?\n"
+                   ) + ', '.join(geom.Uncommitted)
+            if utils.NoYes(self.Main, L("Commit changes?"), msg):
+                geom.geom_commit_all()
