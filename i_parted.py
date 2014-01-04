@@ -5,10 +5,37 @@ from geom import geom
 import curses
 from curses.textpad import Textbox, rectangle
 
+import gettext
+
+L = gettext.gettext
+
 class EntryType:
     Table     = 0
     Partition = 1
     Free      = 2
+
+
+
+class ActionEnum:
+    def __init__(self, default, pairs):
+        self.default = default
+        self.list_ = []
+
+        for p in pairs:
+            self.add(*p)
+
+    def add(self, name, text):
+        setattr(self, name, len(self.list_))
+        self.list_.append('[%s]' % text)
+
+    def get(self):
+        return self.list_
+
+TableActions     = ActionEnum(None, [('None',   L("Choose Partition"))])
+PartitionActions = ActionEnum(0,    [('Select', L("Select")),
+                                     ('Delete', L("Delete Partition")),
+                                    ])
+FreeActions      = ActionEnum(0,    [('New',    L("Create Partition"))])
 
 Window = utils.Window
 class Parted(Window):
@@ -58,14 +85,14 @@ class Parted(Window):
     def set_actions(self):
         ent          = self.tab_entries[self.tab_pos]
         if ent[0] == EntryType.Table:
-            self.act_pos = None
-            self.actions = ['(Choose Partition)']
+            self.act_pos = TableActions.default
+            self.actions = TableActions.get()
         elif ent[0] == EntryType.Partition:
-            self.act_pos = 0
-            self.actions = ['[Select]', '[Delete]']
+            self.act_pos = PartitionActions.default
+            self.actions = PartitionActions.get()
         elif ent[0] == EntryType.Free:
-            self.act_pos = 0
-            self.actions = ['[Create Partition]']
+            self.act_pos = FreeActions.default
+            self.actions = FreeActions.get()
         else:
             raise Exception('invalid table entry type')
 
@@ -128,8 +155,8 @@ class Parted(Window):
         elif utils.isk_left(key, name):
             # left / previous action
             self.select_action(-1)
-        else:
-            raise Exception(' (%s) (%s) ' % (key, name))
+        elif utils.isk_enter(key, name):
+            self.action()
         return True
 
     @staticmethod
@@ -222,6 +249,12 @@ class Parted(Window):
 
         win.refresh()
 
+    def action(self):
+        # see if there's even an action available
+        if self.act_pos is None:
+            return
+
+        ent = self.tab_entries[self.tab_pos]
 
 def partition_action():
     if Main.tables_sel is None:
