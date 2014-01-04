@@ -30,6 +30,7 @@ class ActionEnum:
 
 TableActions     = ActionEnum(None, [('None',   L("Choose Partition"))])
 PartitionActions = ActionEnum(0,    [('Use',    L("Use")),
+                                     ('Unuse',  L("Do not use")),
                                      ('Delete', L("Delete Partition")),
                                     ])
 FreeActions      = ActionEnum(0,    [('New',    L("Create Partition"))])
@@ -178,18 +179,14 @@ class Parted(Window):
     # used to be static but now we need access to self.Main
     def entry_partition(self, maxlen, w, _, t, p):
         bytestr = part.bytes2str(p.bytes_)
-
-        fstab = self.Main.fstab.get(p.name, None)
-        if fstab is None:
-            mountpoint = ''
-        else:
-            mountpoint = 'mountpoint: %s' % fstab['mount']
-
+        usage   = self.used_as(p)
+        if usage is None:
+            usage = ''
         return '  => %s%s%- 14s [%s] %s' % (p.name,
                                          ' ' * (maxlen - len(p.name)),
                                          p.partype,
                                          bytestr,
-                                         mountpoint)
+                                         usage)
 
     def entry_text(self, e, width):
         return { EntryType.Table:     self.entry_table,
@@ -311,7 +308,7 @@ class Parted(Window):
             text = ((L("Do you want to delete partition %s?\n") % p.name)
                    + L("WARNING: THIS OPERATION CANNOT BE UNDONE!")
                    )
-            if utils.NoYes(self.Main, "Delete Partition?", text):
+            if utils.NoYes(self.Main, L("Delete Partition?"), text):
                 msg = self.delete_partition(p)
                 if msg is not None:
                     utils.Message(self.Main, L("Error"), msg)
@@ -331,9 +328,19 @@ class Parted(Window):
 
                 self.set_mountpoint(p, result[0][2])
 
+        elif self.act_pos == PartitionActions.Unuse:
+            usage = self.used_as(p)
+            if usage is None:
+                return
+            text = L('Stop using partition %s?') % p.name
+            if utils.YesNo(self.Main, text, '%s\n%s' % (text, usage)):
+                self.unuse(p.name)
+
         self.draw()
 
     def unuse(self, partname):
+        if self.Main.bootcode == partname:
+            self.Main.bootcode = ''
         try:
             del self.Main.fstab[partname]
         except:
@@ -345,9 +352,25 @@ class Parted(Window):
         if msg is not None:
             return msg
 
+    def used_as(self, part):
+        fstab = self.Main.fstab.get(part.name, None)
+        if fstab is None:
+            if self.Main.bootcode == part.name:
+                return '<bootcode>'
+            else:
+                return None
+        else:
+            return 'mountpoint: %s' % fstab['mount']
+        return None
+
     def set_mountpoint(self, part, point):
         if point is None or len(point) == 0:
             return self.unuse(part.name)
+
+        if point == '*bootcode':
+            self.Main.bootcode = part.name
+            return
+
         self.Main.fstab[part.name] = {
             'mount': point
         }
@@ -355,6 +378,8 @@ class Parted(Window):
     def suggest_mountpoint(self, part):
         if part.partype == 'freebsd-swap':
             return 'swap'
+        if part.partype == 'freebsd-boot':
+            return '*bootcode'
 
         old = self.Main.fstab.get(part.name, None)
         if old is not None:
@@ -373,6 +398,8 @@ class Parted(Window):
         if part.partype == 'freebsd': # MBR has no -swap etc
             if part.bytes_ <= 9*1024*1024*1024:
                 return 'swap'
+            if part.bytes_ <= 8*1024*1024:
+                return '*bootcode'
 
         return ''
 

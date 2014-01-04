@@ -129,6 +129,7 @@ class Window(object):
                 pass
         except KeyboardInterrupt:
             self.result = None
+        curses.curs_set(0)
         return self.result
 
     def __enter__(self):

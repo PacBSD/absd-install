@@ -24,18 +24,21 @@ class Installer(object):
         self.config_file = self.home + '/absd-installer.json'
         self.yank_buf    = ''
 
-        self.fstab = {}
+        self.fstab    = {}
+        self.bootcode = ''
 
         try:
             with open(self.config_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                self.fstab = data['fstab']
+                self.fstab    = data['fstab']
+                self.bootcode = data['bootcode']
         except (FileNotFoundError, PermissionError) as inst:
             print(inst)
 
     def save(self):
         data = {
-            'fstab': self.fstab
+            'fstab':    self.fstab,
+            'bootcode': self.bootcode,
         }
         with open(self.config_file, 'w', encoding='utf-8') as f:
             json.dump(self.data, f, sort_keys=True,
