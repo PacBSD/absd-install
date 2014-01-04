@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 
+# Well, in my VM this does get printed earlier, not as early as I'd like though
+# but good enough...
 print("Loading up installer...")
 
 import utils
