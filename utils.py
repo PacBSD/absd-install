@@ -169,11 +169,14 @@ class MsgBox(Window):
 
     def __init__(self, Main, title, question, buttons=[Yes, No]):
         Window.__init__(self, Main)
-        self.title    = title
-        self.question = question
-        self.buttons  = buttons
-        self.tabcount = len(buttons)
-        self.result   = buttons[0]
+        self.title     = title
+        self.textlines = question.splitlines()
+        self.buttons   = buttons
+        self.tabcount  = len(buttons)
+        self.result    = buttons[0]
+        self.textwidth = 0
+        for line in self.textlines:
+            self.textwidth = max(self.textwidth, len(line))
         self.resize()
 
     def select(self, rel):
@@ -200,8 +203,8 @@ class MsgBox(Window):
 
     def resize(self):
         Main = self.Main
-        self.fullw = max(40, len(self.question) + 4)
-        self.fullh = 6
+        self.fullw = max(40, self.textwidth + 4)
+        self.fullh = 5 + len(self.textlines)
 
         self.width  = self.fullw - 2
         self.height = self.fullh - 2
@@ -223,9 +226,10 @@ class MsgBox(Window):
         win.addstr(0, 3, '[%s:]' % self.title)
 
         y = 1
-        win.hline (y, 1, ' ', width)
-        win.addstr(y, 1, self.question)
-        y += 1
+        for line in self.textlines:
+            win.hline (y, 1, ' ', width)
+            win.addstr(y, 1, line)
+            y += 1
         win.hline (y+0, 1, ' ', width)
         win.hline (y+1, 1, ' ', width)
         win.hline (y+2, 1, ' ', width)

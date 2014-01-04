@@ -264,7 +264,6 @@ class Parted(Window):
             self.action_part(ent[1], ent[2])
 
     def action_free(self, table, start, size):
-        self.draw()
         if self.act_pos == FreeActions.New:
             minsz  = table.sectorsize
             start *= table.sectorsize
@@ -278,6 +277,7 @@ class Parted(Window):
                               )) as dlg:
                 result = dlg.run()
                 if result is None:
+                    self.draw()
                     return
 
                 # convert to table sectors
@@ -289,14 +289,21 @@ class Parted(Window):
                 usize  = min(usize,  size)
                 msg = part.create_partition(table, label, ustart, usize, ty)
                 if msg is not None:
-                    utils.Message(self.Main, "Error", msg)
+                    utils.Message(self.Main, L("Error"), msg)
                 else:
                     self.load()
             delf.draw()
 
-
     def action_part(self, table, part):
-        self.draw()
+        if self.act_pos == PartitionActions.Delete:
+            text = ((L("Do you want to delete partition %s?\n") % part.name)
+                   + L("WARNING: THIS OPERATION CANNOT BE UNDONE!")
+                   )
+            if utils.YesNo(self.Main, "Delete Partition?", text):
+                msg = part.delete_partition(part)
+                if msg is not None:
+                    utils.Message(self.Main, L("Error"), msg)
+            self.draw()
 
 def partition_action():
     if Main.tables_sel is None:
@@ -314,37 +321,6 @@ def partition_action():
             res = dlg.run()
             if res:
                 Main.status_msg = part.delete_partition(partition)
-            draw_gui()
-    elif entry[0] == EntryType.Free:
-        (_, table, start, size) = entry
-
-        #start = start * table.sectorsize
-        #end   = start + size * table.sectorsize
-        end    = start + size
-        start *= table.sectorsize
-        end   *= table.sectorsize
-        size   = str(end - start)
-
-        partype = geom.partition_type_for(table.scheme, 'freebsd-ufs')
-
-        with utils.Dialog(Main, "New Partition",
-                          (('label', str,        '',      None),
-                           ('start', utils.Size, start,   (0, end-start)),
-                           ('size',  utils.Size, size,    (0, end-start)),
-                           ('type',  str,        partype, None)
-                          )) as dlg:
-            result = dlg.run()
-            if result is not None:
-                label, ustart, usize, ty = result
-                bstart = part.str2bytes(ustart[2])
-                bsize  = part.str2bytes(usize[2])
-                if bstart < start:
-                    bstart = start
-                if bsize > (end-start):
-                    bsize = (end-start)
-                msg = part.create_partition(table, label[2], bstart, bsize,
-                                            ty[2])
-                Main.status_msg = msg
             draw_gui()
     else:
         Main.status_msg = "(nothing to do)"
