@@ -283,7 +283,7 @@ class Parted(Window):
                 # convert to table sectors
                 label  = result[0][2]
                 ustart = part.str2bytes(result[1][2])
-                usize  = part.str2types(result[2][2])
+                usize  = part.str2bytes(result[2][2])
                 ty     = result[3][2]
                 ustart = max(ustart, start)
                 usize  = min(usize,  size)
