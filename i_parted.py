@@ -93,11 +93,17 @@ class Parted(Window):
         else:
             raise Exception('invalid table entry type')
 
-    def select_action(self, relative):
+    def select_action(self, relative, wrap=False):
         if self.act_pos is None:
             return
         self.act_pos += relative
-        self.act_pos = max(0, min(len(self.actions)-1, self.act_pos))
+        if wrap:
+            if self.act_pos < 0:
+                self.act_pos = len(self.actions)-1
+            elif self.act_pos >= len(self.actions):
+                self.act_pos = 0
+        else:
+            self.act_pos = max(0, min(len(self.actions)-1, self.act_pos))
         self.draw()
 
     def selection_changed(self):
@@ -148,7 +154,7 @@ class Parted(Window):
             self.selection_changed()
         elif utils.isk_tab(key, name) or utils.isk_right(key, name):
             # tab/right: select next action
-            self.select_action(1)
+            self.select_action(1, wrap=utils.isk_tab(key, name))
         elif utils.isk_left(key, name):
             # left / previous action
             self.select_action(-1)
