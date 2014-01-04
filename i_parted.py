@@ -346,8 +346,8 @@ class Parted(Window):
         except:
             pass
 
-    def delete_partition(self, part):
-        self.unuse(part.name)
+    def delete_partition(self, p):
+        self.unuse(p.name)
         msg = part.delete_partition(p)
         if msg is not None:
             return msg
