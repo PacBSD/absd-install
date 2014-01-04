@@ -36,6 +36,57 @@ def is_valid_char(ch, text, position, type_):
         return ch in string.digits
     return False
 
+def translate_key(key):
+    try:
+        return curses.keyname(key)
+    except ValueError:
+        return key
+
+# vim/emacs/lame key checks:
+def isk_up(key, name):
+    return key == curses.KEY_UP   or name == b'k' or name == b'^P'
+
+def isk_down(key, name):
+    return key == curses.KEY_DOWN or name == b'j' or name == b'^N'
+
+def isk_left(key, name):
+    return key == curses.KEY_LEFT or name == b'h' or name == b'^B'
+
+def isk_right(key, name):
+    return key == curses.KEY_RIGHT or name == b'l' or name == b'^F'
+
+def isk_home(key, name):
+    return key == curses.KEY_HOME or name == b'g' or name == b'^A'
+
+# the emacs key binding here clashes with isk_scrolldown, make sure you test
+# the more important one first...
+def isk_end(key, name):
+    return key == curses.KEY_END  or name == b'G' or name == b'^E'
+
+def isk_pageup(key, name):
+    return key == curses.KEY_PPAGE
+
+def isk_pagedown(key, name):
+    return key == curses.KEY_NPAGE
+
+def isk_scrollup(key, name):
+    return name == b'^Y'
+
+def isk_scrolldown(key, name):
+    return name == b'^E'
+
+def isk_tab(key, name):
+    return name == b'^I'
+
+def isk_enter(key, name):
+    return key == curses.KEY_ENTER
+
+def isk_backspace(key, name):
+    return key == curses.KEY_BACKSPACE or name == b'^H'
+
+def isk_del(key, name):
+    return key == curses.KEY_DC or name == b'^D'
+
 class Window(object):
     def __init__(self, Main):
         self.Main     = Main
@@ -75,7 +126,7 @@ class Window(object):
             self.Main.resize_event()
             self.resize()
             self.draw()
-        elif name == b'^I':
+        elif isk_tab(key, name):
             self.current += 1
             if self.current >= self.tabcount:
                 self.current = 0
@@ -103,7 +154,7 @@ class YesNo(Window):
         self.resize()
 
     def event(self, key, name):
-        if key == curses.KEY_ENTER:
+        if isk_enter(key, name):
             self.result = (self.current == 0)
             return False
         return True
@@ -171,7 +222,7 @@ class Dialog(Window):
         self.resize()
 
     def event(self, key, name):
-        if key == curses.KEY_ENTER:
+        if isk_enter(key, name):
             if self.current == len(self.fields):
                 self.result = self.fields
                 return False
@@ -184,24 +235,24 @@ class Dialog(Window):
         elif self.current < len(self.fields):
             title, type_, value, limit = self.fields[self.current]
             ch = chr(key)
-            if   key == curses.KEY_LEFT  or name == b'^B':
+            if isk_left(key, name):
                 self.cursor = max(0, self.cursor-1)
-            elif key == curses.KEY_RIGHT or name == b'^F':
+            elif isk_right(key, name):
                 self.cursor += 1
                 self.cursor = min(self.cursor,
                                   len(self.fields[self.current][2]))
-            elif key == curses.KEY_BACKSPACE or name == b'^H':
+            elif isk_backspace(key, name):
                 if self.cursor > 0:
                     value = value[0:self.cursor-1] + value[self.cursor:]
                     self.fields[self.current] = (title, type_, value, limit)
                     self.cursor -= 1
-            elif key == curses.KEY_DC or name == b'^D':
+            elif isk_del(key, name):
                 if self.cursor < len(self.fields[self.current][2]):
                     value = value[0:self.cursor] + value[self.cursor+1:]
                     self.fields[self.current] = (title, type_, value, limit)
-            elif name == b'^A':
+            elif isk_home(key, name):
                 self.cursor = 0
-            elif name == b'^E':
+            elif isk_end(key, name):
                 self.cursor = len(self.fields[self.current][2])
             elif (ch in string.printable and 
                   is_valid_char(ch, value, self.cursor, type_)
