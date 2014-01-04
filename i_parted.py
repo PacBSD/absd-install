@@ -304,24 +304,3 @@ class Parted(Window):
                 if msg is not None:
                     utils.Message(self.Main, L("Error"), msg)
             self.draw()
-
-def partition_action():
-    if Main.tables_sel is None:
-        return
-    (text, entry) = Main.tables_sel
-    if entry[0] == EntryType.Table:
-        Main.status_msg = "Partition Table actions not implemented"
-        draw_gui()
-    elif entry[0] == EntryType.Partition:
-        (_, table, partition) = entry
-        with utils.YesNo(Main, "Delete Partition",
-                         "Do you want to delete partition %s?" % partition.name
-                        ) as dlg:
-            dlg.current = 1
-            res = dlg.run()
-            if res:
-                Main.status_msg = part.delete_partition(partition)
-            draw_gui()
-    else:
-        Main.status_msg = "(nothing to do)"
-        draw_gui()
