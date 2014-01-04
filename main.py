@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 
+print("Loading up installer...")
+
 import utils
 import i_parted
 
