@@ -4,6 +4,8 @@
 # but good enough...
 print("Loading up installer...")
 
+import part
+
 import utils
 import i_parted
 
@@ -77,6 +79,7 @@ class Installer(object):
             # Now that the terminal can actually display text again
             # rethrow the exception
             raise inst
+        part.info()
 
     def setup_gui(self):
         curses.start_color()

@@ -77,13 +77,35 @@ class PartitionTable(object):
 
 def load():
     tables = []
+    used   = []
+    unused = []
     with geom.Mesh() as mesh:
-        gpart = mesh.find_class(b'PART')
-        if gpart is None:
-            return None
-        for g in gpart.geoms():
-            tables.append(PartitionTable.from_geom(g))
-    return tables
+        # first all the used ones
+        cl = mesh.find_class(b'PART')
+        if cl is not None:
+            for g in cl.geoms():
+                used.append(g.name)
+                tables.append(PartitionTable.from_geom(g))
+
+        # now fill the unused-array
+        for cl in mesh.classes():
+            if cl.name == 'PART':
+                continue
+            load_class(cl, used, unused)
+    return tables, unused
+
+def load_class(cl, used, unused):
+    for g in cl.geoms():
+        for p in g.providers():
+            if p.name.startswith('cd'):
+                # hard masking this one -_-
+                continue
+            if '/' in p.name:
+                # this is a partition...
+                continue
+            if p.name in used or p.name in unused:
+                continue
+            unused.append(p.name)
 
 def info():
     with geom.Mesh() as mesh:

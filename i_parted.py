@@ -8,32 +8,28 @@ from curses.textpad import Textbox, rectangle
 import gettext
 L = gettext.gettext
 
-class EntryType:
-    Table     = 0
-    Partition = 1
-    Free      = 2
-
 class ActionEnum:
     def __init__(self, default, pairs):
         self.default = default
-        self.list_ = []
+        self.actions = []
 
         for p in pairs:
             self.add(*p)
 
     def add(self, name, text):
-        setattr(self, name, len(self.list_))
-        self.list_.append('[%s]' % text)
+        setattr(self, name, len(self.actions))
+        self.actions.append('[%s]' % text)
 
     def get(self):
         return self.list_
 
-TableActions     = ActionEnum(None, [('None',   L("Choose Partition"))])
-PartitionActions = ActionEnum(0,    [('Use',    L("Use")),
+TableEntry     = ActionEnum(None, [('None',   L("Choose Partition"))])
+PartitionEntry = ActionEnum(0,    [('Use',    L("Use")),
                                      ('Unuse',  L("Do not use")),
                                      ('Delete', L("Delete Partition")),
                                     ])
-FreeActions      = ActionEnum(0,    [('New',    L("Create Partition"))])
+FreeEntry      = ActionEnum(0,    [('New',    L("Create Partition"))])
+EmptyEntry     = ActionEnum(0,    [('Create', L("Setup Partition Table"))])
 
 Window = utils.Window
 class Parted(Window):
@@ -62,37 +58,30 @@ class Parted(Window):
         self.tab_longest = 0
         for t in self.tables:
             self.tab_longest = max(self.tab_longest, len(t.name))
-            yield (EntryType.Table, t)
+            yield (TableEntry, t)
             at = t.first
             for p in t.partitions:
                 if p.start > at:
-                    yield (EntryType.Free, t, at, p.start - at)
+                    yield (FreeEntry, t, at, p.start - at)
                 self.tab_longest = max(self.tab_longest, len(p.name))
-                yield (EntryType.Partition, t, p)
+                yield (PartitionEntry, t, p)
                 at = p.end + 1
             if at < t.last:
-                yield (EntryType.Free, t, at, t.last - at)
+                yield (FreeEntry, t, at, t.last - at)
+        for u in self.unused:
+            yield (EmptyEntry, u)
 
     def load(self):
         self.win.clear()
-        self.tables      = part.load()
+        self.tables, self.unused = part.load()
         self.tab_entries = [i for i in self.iterate()]
         self.tab_pos     = min(self.tab_pos, len(self.tab_entries)-1)
         self.set_actions()
 
     def set_actions(self):
-        ent          = self.tab_entries[self.tab_pos]
-        if ent[0] == EntryType.Table:
-            self.act_pos = TableActions.default
-            self.actions = TableActions.get()
-        elif ent[0] == EntryType.Partition:
-            self.act_pos = PartitionActions.default
-            self.actions = PartitionActions.get()
-        elif ent[0] == EntryType.Free:
-            self.act_pos = FreeActions.default
-            self.actions = FreeActions.get()
-        else:
-            raise Exception('invalid table entry type')
+        ent = self.tab_entries[self.tab_pos]
+        self.act_pos = ent[0].default
+        self.actions = ent[0].actions
 
     def select_action(self, relative, wrap=False):
         if self.act_pos is None:
@@ -188,12 +177,19 @@ class Parted(Window):
                                          bytestr,
                                          usage)
 
+    @staticmethod
+    def entry_empty(maxlen, w, _, name):
+        return 'disk: %s' % name
+
     def entry_text(self, e, width):
-        return { EntryType.Table:     self.entry_table,
-                 EntryType.Free:      self.entry_free,
-                 EntryType.Partition:
-                    lambda a,b,c,d,e: self.entry_partition(a,b,c,d,e),
-               }.get(e[0])(self.tab_longest+2, width, *e)
+        for i in [(TableEntry,     self.entry_table),
+                  (FreeEntry,      self.entry_free),
+                  (PartitionEntry,
+                        lambda a,b,c,d,e: self.entry_partition(a,b,c,d,e)),
+                  (EmptyEntry,     self.entry_empty)]:
+            if i[0] == e[0]:
+                return i[1](self.tab_longest+2, width, *e)
+        raise Exception('invalid entry type')
 
     def draw(self):
         Main   = self.Main
@@ -267,9 +263,9 @@ class Parted(Window):
             return
 
         ent = self.tab_entries[self.tab_pos]
-        if ent[0] == EntryType.Free:
+        if ent[0] == FreeEntry:
             self.action_free(ent[1], ent[2], ent[3])
-        elif ent[0] == EntryType.Partition:
+        elif ent[0] == PartitionEntry:
             self.action_part(ent[1], ent[2])
 
     def action_free(self, table, start, size):
