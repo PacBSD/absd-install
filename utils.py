@@ -151,6 +151,10 @@ def YesNo(Main, title, question):
     with MsgBox(Main, title, question) as dlg:
         return dlg.run() == MsgBox.Yes
 
+def NoYes(Main, title, question):
+    with MsgBox(Main, title, question, buttons=[MsgBox.No, MsgBox.Yes]) as dlg:
+        return dlg.run() == MsgBox.Yes
+
 def Message(Main, title, text):
     with MsgBox(Main, title, text, buttons=[MsgBox.Ok]) as dlg:
         dlg.run()

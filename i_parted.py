@@ -299,7 +299,7 @@ class Parted(Window):
             text = ((L("Do you want to delete partition %s?\n") % p.name)
                    + L("WARNING: THIS OPERATION CANNOT BE UNDONE!")
                    )
-            if utils.YesNo(self.Main, "Delete Partition?", text):
+            if utils.NoYes(self.Main, "Delete Partition?", text):
                 msg = part.delete_partition(p)
                 if msg is not None:
                     utils.Message(self.Main, L("Error"), msg)
