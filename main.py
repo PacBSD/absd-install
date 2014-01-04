@@ -24,7 +24,7 @@ class Installer(object):
         self.config_file = self.home + '/absd-installer.json'
         self.yank_buf    = ''
 
-        self.fstab = []
+        self.fstab = {}
 
         try:
             with open(self.config_file, 'r', encoding='utf-8') as f:

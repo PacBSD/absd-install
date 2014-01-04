@@ -119,6 +119,8 @@ class Window(object):
         self.win      = curses.newwin(5, 5)
         self.notab    = False
 
+        self.enter_accepts = False
+
     def run(self):
         self.resize()
         self.draw()
@@ -150,14 +152,18 @@ class Window(object):
             self.resize()
             self.draw()
         elif not self.notab and isk_tab(key, name):
-            self.current += 1
-            if self.current >= self.tabcount:
-                self.current = 0
+            self.tab()
             self.tabbed()
             self.draw()
         else:
             return self.event(key, name)
         return True
+
+    def tab(self):
+        self.current += 1
+        if self.current >= self.tabcount:
+            self.current = 0
+        self.tabbed()
 
     def before_close(self):
         pass
@@ -285,16 +291,17 @@ class Dialog(Window):
         self.cursor  = 0
 
         self.resize()
+        self.tabbed()
 
     def event(self, key, name):
         if isk_enter(key, name):
-            if self.current == len(self.fields):
+            if self.current == len(self.fields) or self.enter_accepts:
                 self.result = self.fields
                 return False
             if self.current == len(self.fields)+1:
                 self.result = None
                 return False
-            self.tabbed()
+            self.tab()
             self.draw()
             return True
         elif key == b'q':

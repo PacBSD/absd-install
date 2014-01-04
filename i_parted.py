@@ -172,20 +172,30 @@ class Parted(Window):
                                     part.bytes2str(t.size))
 
     @staticmethod
-    def entry_partition(maxlen, w, _, t, p):
-        return '  => %s%s%- 14s [%s]' % (p.name,
-                                         ' ' * (maxlen - len(p.name)),
-                                         p.partype,
-                                         part.bytes2str(p.bytes_))
-
-    @staticmethod
     def entry_free(maxlen, w, _, t, beg, sz):
         return '   * free: (%s)' % part.bytes2str(sz * t.sectorsize)
 
+    # used to be static but now we need access to self.Main
+    def entry_partition(self, maxlen, w, _, t, p):
+        bytestr = part.bytes2str(p.bytes_)
+
+        fstab = self.Main.fstab.get(p.name, None)
+        if fstab is None:
+            mountpoint = ''
+        else:
+            mountpoint = 'mountpoint: %s' % fstab['mount']
+
+        return '  => %s%s%- 14s [%s] %s' % (p.name,
+                                         ' ' * (maxlen - len(p.name)),
+                                         p.partype,
+                                         bytestr,
+                                         mountpoint)
+
     def entry_text(self, e, width):
         return { EntryType.Table:     self.entry_table,
-                 EntryType.Partition: self.entry_partition,
                  EntryType.Free:      self.entry_free,
+                 EntryType.Partition:
+                    lambda a,b,c,d,e: self.entry_partition(a,b,c,d,e),
                }.get(e[0])(self.tab_longest+2, width, *e)
 
     def draw(self):
@@ -272,11 +282,11 @@ class Parted(Window):
             size  *= table.sectorsize
             partype = geom.partition_type_for(table.scheme, 'freebsd-ufs')
             with utils.Dialog(self.Main, L('New Partition'),
-                              (('label', utils.Label, '',      None),
+                              [('label', utils.Label, '',      None),
                                ('start', utils.Size,  start,   (0, size)),
                                ('size',  utils.Size,  size,    (minsz, size)),
                                ('type',  str,         partype, None)
-                              )) as dlg:
+                              ]) as dlg:
                 result = dlg.run()
                 if result is None:
                     self.draw()
@@ -302,12 +312,64 @@ class Parted(Window):
                    + L("WARNING: THIS OPERATION CANNOT BE UNDONE!")
                    )
             if utils.NoYes(self.Main, "Delete Partition?", text):
-                msg = part.delete_partition(p)
+                msg = self.delete_partition(p)
                 if msg is not None:
                     utils.Message(self.Main, L("Error"), msg)
                 else:
                     self.load()
-            self.draw()
+
+        elif self.act_pos == PartitionActions.Use:
+            point = self.suggest_mountpoint(p)
+            with utils.Dialog(self.Main, L('Use Partition %s') % p.name,
+                              [('Mountpoint', str, point, None)]
+                             ) as dlg:
+                dlg.enter_accepts = True
+                result = dlg.run()
+                if result is None:
+                    self.draw()
+                    return
+
+                self.set_mountpoint(p, result[0][2])
+
+        self.draw()
+
+    def delete_partition(self, part):
+        try:
+            del self.Main.fstab[part.name]
+        except:
+            pass
+        msg = part.delete_partition(p)
+        if msg is not None:
+            return msg
+
+    def set_mountpoint(self, part, point):
+        self.Main.fstab[part.name] = {
+            'mount': point
+        }
+
+    def suggest_mountpoint(self, part):
+        if part.partype == 'freebsd-swap':
+            return 'swap'
+
+        old = self.Main.fstab.get(part.name, None)
+        if old is not None:
+            return old['mount']
+
+        suggestions = [ '/', '/home' ]
+        current = 0
+        for k,v in self.Main.fstab:
+            if k == suggestions[current]:
+                current += 1
+                if current >= len(suggestions):
+                    break
+        if current < len(suggestions):
+            return suggestions[current]
+
+        if part.partype == 'freebsd': # MBR has no -swap etc
+            if part.bytes_ <= 9*1024*1024*1024:
+                return 'swap'
+
+        return ''
 
     def before_close(self):
         if len(geom.Uncommitted):
