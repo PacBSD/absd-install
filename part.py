@@ -182,8 +182,8 @@ def create_partition(table, label, start, size, type_):
 
     return geom.geom_part_do(table.name, 'add', data)
 
-def create_partition_table(provider, type_):
-    data = [('type', str, type_)]
+def create_partition_table(provider, scheme):
+    data = [('scheme', str, scheme)]
     return geom.geom_part_do(provider.name, 'create', data)
 
 __all__ = ['find_cfg',

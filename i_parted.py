@@ -274,7 +274,7 @@ class Parted(Window):
     def action_empty(self, provider):
         if self.act_pos == EmptyEntry.New:
             with utils.Dialog(self.Main, L('New Partition Table'),
-                              [('type', str, 'GPT', None)]) as dlg:
+                              [('scheme', str, 'GPT', None)]) as dlg:
                 result = dlg.run()
                 if result is None:
                     self.draw()
