@@ -23,13 +23,13 @@ class ActionEnum:
     def get(self):
         return self.list_
 
-TableEntry     = ActionEnum(None, [('Delete', L("Destroy Partition Table"))])
-PartitionEntry = ActionEnum(0,    [('Use',    L("Use")),
-                                   ('Unuse',  L("Do not use")),
-                                   ('Delete', L("Delete Partition")),
-                                  ])
-FreeEntry      = ActionEnum(0,    [('New',    L("Create Partition"))])
-EmptyEntry     = ActionEnum(0,    [('New',    L("Setup Partition Table"))])
+TableEntry     = ActionEnum(0, [('Delete', L("Destroy Partition Table"))])
+PartitionEntry = ActionEnum(0, [('Use',    L("Use")),
+                                ('Unuse',  L("Do not use")),
+                                ('Delete', L("Delete Partition")),
+                               ])
+FreeEntry      = ActionEnum(0, [('New',    L("Create Partition"))])
+EmptyEntry     = ActionEnum(0, [('New',    L("Setup Partition Table"))])
 
 Window = utils.Window
 class Parted(Window):
