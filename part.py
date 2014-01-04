@@ -105,7 +105,7 @@ def load_class(cl, used, unused):
                 continue
             if p.name in used or p.name in unused:
                 continue
-            unused.append(p.name)
+            unused.append(p)
 
 def info():
     with geom.Mesh() as mesh:
@@ -182,6 +182,9 @@ def create_partition(table, label, start, size, type_):
 
     return geom.geom_part_do(table.name, 'add', data)
 
+def create_partition_table(provider, type_):
+    data = [('type', str, type_)]
+    return geom.geom_part_do(provider.name, 'create', data)
 
 __all__ = ['find_cfg',
            'Partition',
@@ -192,4 +195,5 @@ __all__ = ['find_cfg',
            'str2bytes',
            'create_partition',
            'delete_partition',
+           'create_partition_table',
           ]

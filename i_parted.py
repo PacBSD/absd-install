@@ -25,11 +25,11 @@ class ActionEnum:
 
 TableEntry     = ActionEnum(None, [('None',   L("Choose Partition"))])
 PartitionEntry = ActionEnum(0,    [('Use',    L("Use")),
-                                     ('Unuse',  L("Do not use")),
-                                     ('Delete', L("Delete Partition")),
-                                    ])
+                                   ('Unuse',  L("Do not use")),
+                                   ('Delete', L("Delete Partition")),
+                                  ])
 FreeEntry      = ActionEnum(0,    [('New',    L("Create Partition"))])
-EmptyEntry     = ActionEnum(0,    [('Create', L("Setup Partition Table"))])
+EmptyEntry     = ActionEnum(0,    [('New',    L("Setup Partition Table"))])
 
 Window = utils.Window
 class Parted(Window):
@@ -178,8 +178,9 @@ class Parted(Window):
                                          usage)
 
     @staticmethod
-    def entry_empty(maxlen, w, _, name):
-        return 'disk: %s' % name
+    def entry_empty(maxlen, w, _, provider):
+        size = part.bytes2str(provider.mediasize)
+        return 'disk: %s [%s]' % (provider.name, size)
 
     def entry_text(self, e, width):
         for i in [(TableEntry,     self.entry_table),
@@ -267,6 +268,23 @@ class Parted(Window):
             self.action_free(ent[1], ent[2], ent[3])
         elif ent[0] == PartitionEntry:
             self.action_part(ent[1], ent[2])
+        elif ent[0] == EmptyEntry:
+            self.action_empty(ent[1])
+
+    def action_empty(self, provider):
+        if self.act_pos == EmptyEntry.New:
+            with utils.Dialog(self.Main, L('New Partition Table'),
+                              [('type', str, 'GPT', None)]) as dlg:
+                result = dlg.run()
+                if result is None:
+                    self.draw()
+                    return
+                msg = part.create_partition_table(provider, result[0][2])
+                if msg is not None:
+                    utils.Message(self.Main, L("Error"), msg)
+                else:
+                    self.load()
+            self.draw()
 
     def action_free(self, table, start, size):
         if self.act_pos == FreeActions.New:
