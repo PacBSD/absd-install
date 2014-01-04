@@ -52,31 +52,31 @@ class Parted(Window):
 
     def event(self, key, name):
         maxpos = len(self.tab_entries)-1
-        if   key == curses.KEY_DOWN or name == b'j' or name == b'^N':
+        if utils.isk_down(key, name):
             # Down
             self.tab_pos = min(self.tab_pos+1, maxpos)
             self.draw()
-        elif key == curses.KEY_UP   or name == b'k' or name == b'^P':
+        elif utils.isk_up(key, name):
             # Up
             self.tab_pos = max(self.tab_pos-1, 0)
             self.draw()
-        elif key == curses.KEY_HOME or name == b'g':
+        elif utils.isk_home(key, name):
             # Top:
             self.tab_pos = 0
             self.draw()
-        elif key == curses.KEY_END  or name == b'G':
+        elif utils.isk_end(key, name):
             # Bottom:
             self.tab_pos = maxpos
             self.draw()
-        elif name == b'^E':
+        elif utils.isk_scrolldown(key, name):
             # scroll down
             self.tab_scroll = min(self.tab_scroll+1, maxpos)
             self.draw()
-        elif name == b'^Y':
+        elif utils.isk_scrollup(key, name):
             # scroll up
             self.tab_scroll = max(self.tab_scroll-1, 0)
             self.draw()
-        elif key == curses.KEY_NPAGE:
+        elif utils.isk_pagedown(key, name):
             # page down
             if self.tab_pos != self.tab_scroll + self.height - 3:
                 self.tab_pos = self.tab_scroll + self.height - 3
@@ -84,7 +84,7 @@ class Parted(Window):
                 self.tab_pos += self.height-3
             self.tab_pos = min(maxpos, max(0, self.tab_pos))
             self.draw()
-        elif key == curses.KEY_PPAGE:
+        elif utils.isk_pageup(key, name):
             # page up
             if self.tab_pos != self.tab_scroll:
                 self.tab_pos = self.tab_scroll
