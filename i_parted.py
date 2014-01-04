@@ -275,6 +275,7 @@ class Parted(Window):
         if self.act_pos == EmptyEntry.New:
             with utils.Dialog(self.Main, L('New Partition Table'),
                               [('scheme', str, 'GPT', None)]) as dlg:
+                dlg.enter_accepts = True
                 result = dlg.run()
                 if result is None:
                     self.draw()
