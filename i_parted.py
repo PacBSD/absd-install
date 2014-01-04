@@ -13,8 +13,6 @@ class EntryType:
     Partition = 1
     Free      = 2
 
-
-
 class ActionEnum:
     def __init__(self, default, pairs):
         self.default = default
@@ -31,7 +29,7 @@ class ActionEnum:
         return self.list_
 
 TableActions     = ActionEnum(None, [('None',   L("Choose Partition"))])
-PartitionActions = ActionEnum(0,    [('Select', L("Select")),
+PartitionActions = ActionEnum(0,    [('Use',    L("Use")),
                                      ('Delete', L("Delete Partition")),
                                     ])
 FreeActions      = ActionEnum(0,    [('New',    L("Create Partition"))])
@@ -261,6 +259,34 @@ class Parted(Window):
 
     def action_free(self, table, start, size):
         self.draw()
+        if self.act_pos == FreeActions.New:
+            minsz  = table.sectorsize
+            start *= table.sectorsize
+            size  *= table.sectorsize
+            partype = geom.partition_type_for(table.scheme, 'freebsd-ufs')
+            with utils.Dialog(self.Main, L('New Partition'),
+                              (('label', str,        '',      None),
+                               ('start', utils.Size, start,   (0, size)),
+                               ('size',  utils.Size, size,    (minsz, size)),
+                               ('type',  str,        partype, None)
+                              )) as dlg:
+                result = dlg.run()
+                if result is None:
+                    return
+
+                # convert to table sectors
+                label  = result[0][2]
+                ustart = part.str2bytes(result[1][2])
+                usize  = part.str2types(result[2][2])
+                ty     = result[3][2]
+                ustart = max(ustart, start)
+                usize  = min(usize,  size)
+                msg = part.create_partition(table, label, ustart, usize, ty)
+                if msg is not None:
+                    utils.Message(self.Main, "Error", msg)
+                else:
+                    self.load()
+
 
     def action_part(self, table, part):
         self.draw()
