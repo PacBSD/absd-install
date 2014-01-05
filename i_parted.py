@@ -8,28 +8,22 @@ from curses.textpad import Textbox, rectangle
 import gettext
 L = gettext.gettext
 
-class ActionEnum:
-    def __init__(self, default, pairs):
-        self.default = default
-        self.actions = []
+class Entry(object):
+    def __init__(self, actions):
+        self.actions = actions
+        self.default = 0
 
-        for p in pairs:
-            self.add(*p)
+    @staticmethod
+    def entry_text(parted, maxlen, win_width, data):
+        return '<missing entry_text implementation>'
 
-    def add(self, name, text):
-        setattr(self, name, len(self.actions))
-        self.actions.append('[%s]' % text)
-
-    def get(self):
-        return self.list_
-
-TableEntry     = ActionEnum(0, [('Delete', L("Destroy Partition Table"))])
-PartitionEntry = ActionEnum(0, [('Use',    L("Use")),
-                                ('Unuse',  L("Do not use")),
-                                ('Delete', L("Delete Partition")),
-                               ])
-FreeEntry      = ActionEnum(0, [('New',    L("Create Partition"))])
-EmptyEntry     = ActionEnum(0, [('New',    L("Setup Partition Table"))])
+TableActions     = Entry([('act_table_destroy', L("Destroy Partition Table"))])
+PartitionActions = Entry([('act_part_use',      L("Use")),
+                          ('act_part_unuse',    L("Don't use")),
+                          ('act_part_delete',   L("Delete Partition")),
+                         ])
+FreeActions      = Entry([('act_create_part',   L("Create Partition"))])
+DiskActions      = Entry([('act_disk_setup',    L("Setup Partition Table"))])
 
 Window = utils.Window
 class Parted(Window):
@@ -58,18 +52,18 @@ class Parted(Window):
         self.tab_longest = 0
         for t in self.tables:
             self.tab_longest = max(self.tab_longest, len(t.name))
-            yield (TableEntry, t)
+            yield (TableActions, (t,))
             at = t.first
             for p in t.partitions:
                 if p.start > at:
-                    yield (FreeEntry, t, at, p.start - at)
+                    yield (FreeActions, (t, at, p.start - at))
                 self.tab_longest = max(self.tab_longest, len(p.name))
-                yield (PartitionEntry, t, p)
+                yield (PartitionActions, (t, p))
                 at = p.end + 1
             if at < t.last:
-                yield (FreeEntry, t, at, t.last - at)
+                yield (FreeActions, (t, at, t.last - at))
         for u in self.unused:
-            yield (EmptyEntry, u)
+            yield (DiskActions, (u,))
 
     def load(self):
         self.win.clear()
@@ -154,43 +148,8 @@ class Parted(Window):
             self.action()
         return True
 
-    @staticmethod
-    def entry_table(maxlen, w, _, t):
-        return '%s%s    %s [%s]' % (t.name,
-                                    ' ' * (maxlen - len(t.name)),
-                                    t.scheme,
-                                    part.bytes2str(t.size))
-
-    @staticmethod
-    def entry_free(maxlen, w, _, t, beg, sz):
-        return '   * free: (%s)' % part.bytes2str(sz * t.sectorsize)
-
-    # used to be static but now we need access to self.Main
-    def entry_partition(self, maxlen, w, _, t, p):
-        bytestr = part.bytes2str(p.bytes_)
-        usage   = self.used_as(p)
-        if usage is None:
-            usage = ''
-        return '  => %s%s%- 14s [%s] %s' % (p.name,
-                                         ' ' * (maxlen - len(p.name)),
-                                         p.partype,
-                                         bytestr,
-                                         usage)
-
-    @staticmethod
-    def entry_empty(maxlen, w, _, provider):
-        size = part.bytes2str(provider.mediasize)
-        return 'disk: %s [%s]' % (provider.name, size)
-
     def entry_text(self, e, width):
-        for i in [(TableEntry,     self.entry_table),
-                  (FreeEntry,      self.entry_free),
-                  (PartitionEntry,
-                        lambda a,b,c,d,e: self.entry_partition(a,b,c,d,e)),
-                  (EmptyEntry,     self.entry_empty)]:
-            if i[0] == e[0]:
-                return i[1](self.tab_longest+2, width, *e)
-        raise Exception('invalid entry type')
+        return e[0].entry_text(self, self.tab_longest+2, width, e)
 
     def draw(self):
         Main   = self.Main
@@ -234,8 +193,8 @@ class Parted(Window):
         for i in range(self.tab_scroll, count):
             if y > height:
                 break
-            ent = self.tab_entries[i]
-            txt = self.entry_text(ent, width)
+            ent, edata = self.tab_entries[i]
+            txt = ent.entry_text(self, self.tab_longest+2, width, *edata)
             if eindex == selected:
                 attr = curses.A_REVERSE
             else:
@@ -248,7 +207,7 @@ class Parted(Window):
         x = 2
         y = act_line
         for i in range(len(self.actions)):
-            a = self.actions[i]
+            a = self.actions[i][1]
             if i == self.act_pos:
                 attr = curses.A_REVERSE
             else:
@@ -263,110 +222,94 @@ class Parted(Window):
         if self.act_pos is None:
             return
 
-        ent = self.tab_entries[self.tab_pos]
-        if ent[0] == FreeEntry:
-            self.action_free(ent[1], ent[2], ent[3])
-        elif ent[0] == PartitionEntry:
-            self.action_part(ent[1], ent[2])
-        elif ent[0] == EmptyEntry:
-            self.action_empty(ent[1])
-        elif ent[0] == TableEntry:
-            self.action_table(ent[1])
-
-    def action_table(self, table):
-        if self.act_pos == TableEntry.Delete:
-            text = ((L("Do you want to destroy %s?\n") % table.name)
-                   + L("WARNING: THIS OPERATION CANNOT BE UNDONE!")
-                   )
-            if utils.NoYes(self.Main, L("Destroy Table?"), text):
-                msg = part.destroy_partition_table(table)
-                if msg is not None:
-                    utils.Message(self.Main, L("Error"), msg)
-                else:
-                    self.load()
-            self.draw()
-
-    def action_empty(self, provider):
-        if self.act_pos == EmptyEntry.New:
-            with utils.Dialog(self.Main, L('New Partition Table'),
-                              [('scheme', str, 'GPT', None)]) as dlg:
-                dlg.enter_accepts = True
-                result = dlg.run()
-                if result is None:
-                    self.draw()
-                    return
-                msg = part.create_partition_table(provider, result[0][2])
-                if msg is not None:
-                    utils.Message(self.Main, L("Error"), msg)
-                else:
-                    self.load()
-            self.draw()
-
-    def action_free(self, table, start, size):
-        if self.act_pos == FreeEntry.New:
-            minsz  = table.sectorsize
-            start *= table.sectorsize
-            size  *= table.sectorsize
-            partype = geom.partition_type_for(table.scheme, 'freebsd-ufs')
-            with utils.Dialog(self.Main, L('New Partition'),
-                              [('label', utils.Label, '',      None),
-                               ('start', utils.Size,  start,   (0, size)),
-                               ('size',  utils.Size,  size,    (minsz, size)),
-                               ('type',  str,         partype, None)
-                              ]) as dlg:
-                result = dlg.run()
-                if result is None:
-                    self.draw()
-                    return
-
-                # convert to table sectors
-                label  = result[0][2]
-                ustart = part.str2bytes(result[1][2])
-                usize  = part.str2bytes(result[2][2])
-                ty     = result[3][2]
-                ustart = max(ustart, start)
-                usize  = min(usize,  size)
-                msg = part.create_partition(table, label, ustart, usize, ty)
-                if msg is not None:
-                    utils.Message(self.Main, L("Error"), msg)
-                else:
-                    self.load()
-            self.draw()
-
-    def action_part(self, table, p):
-        if self.act_pos == PartitionEntry.Delete:
-            text = ((L("Do you want to delete partition %s?\n") % p.name)
-                   + L("WARNING: THIS OPERATION CANNOT BE UNDONE!")
-                   )
-            if utils.NoYes(self.Main, L("Delete Partition?"), text):
-                msg = self.delete_partition(p)
-                if msg is not None:
-                    utils.Message(self.Main, L("Error"), msg)
-                else:
-                    self.load()
-
-        elif self.act_pos == PartitionEntry.Use:
-            point = self.suggest_mountpoint(p)
-            with utils.Dialog(self.Main, L('Use Partition %s') % p.name,
-                              [('Mountpoint', str, point, None)]
-                             ) as dlg:
-                dlg.enter_accepts = True
-                result = dlg.run()
-                if result is None:
-                    self.draw()
-                    return
-
-                self.set_mountpoint(p, result[0][2])
-
-        elif self.act_pos == PartitionEntry.Unuse:
-            usage = self.used_as(p)
-            if usage is None:
-                return
-            text = L('Stop using partition %s?') % p.name
-            if utils.YesNo(self.Main, text, '%s\n%s' % (text, usage)):
-                self.unuse(p.name)
-
+        entry, data = self.tab_entries[self.tab_pos]
+        method  = entry.actions[self.act_pos][0]
+        func    = getattr(self, method)
+        func(*data)
         self.draw()
+
+    def act_table_destroy(self, table):
+        text = ((L("Do you want to destroy %s?\n") % table.name)
+               + L("WARNING: THIS OPERATION CANNOT BE UNDONE!")
+               )
+        if utils.NoYes(self.Main, L("Destroy Table?"), text):
+            msg = part.destroy_partition_table(table)
+            if msg is not None:
+                utils.Message(self.Main, L("Error"), msg)
+            else:
+                self.load()
+
+    def act_disk_setup(self, provider):
+        with utils.Dialog(self.Main, L('New Partition Table'),
+                          [('scheme', str, 'GPT', None)]) as dlg:
+            dlg.enter_accepts = True
+            result = dlg.run()
+            if result is None:
+                return
+            msg = part.create_partition_table(provider, result[0][2])
+            if msg is not None:
+                utils.Message(self.Main, L("Error"), msg)
+            else:
+                self.load()
+
+    def act_create_part(self, table, start, size):
+        minsz  = table.sectorsize
+        start *= table.sectorsize
+        size  *= table.sectorsize
+        partype = geom.partition_type_for(table.scheme, 'freebsd-ufs')
+        with utils.Dialog(self.Main, L('New Partition'),
+                          [('label', utils.Label, '',      None),
+                           ('start', utils.Size,  start,   (0, size)),
+                           ('size',  utils.Size,  size,    (minsz, size)),
+                           ('type',  str,         partype, None)
+                          ]) as dlg:
+            result = dlg.run()
+            if result is None:
+                return
+
+            # convert to table sectors
+            label  = result[0][2]
+            ustart = part.str2bytes(result[1][2])
+            usize  = part.str2bytes(result[2][2])
+            ty     = result[3][2]
+            ustart = max(ustart, start)
+            usize  = min(usize,  size)
+            msg = part.create_partition(table, label, ustart, usize, ty)
+            if msg is not None:
+                utils.Message(self.Main, L("Error"), msg)
+            else:
+                self.load()
+
+    def act_part_delete(self, table, p):
+        text = ((L("Do you want to delete partition %s?\n") % p.name)
+               + L("WARNING: THIS OPERATION CANNOT BE UNDONE!")
+               )
+        if utils.NoYes(self.Main, L("Delete Partition?"), text):
+            msg = self.delete_partition(p)
+            if msg is not None:
+                utils.Message(self.Main, L("Error"), msg)
+            else:
+                self.load()
+
+    def act_part_use(self, table, p):
+        point = self.suggest_mountpoint(p)
+        with utils.Dialog(self.Main, L('Use Partition %s') % p.name,
+                          [('Mountpoint', str, point, None)]
+                         ) as dlg:
+            dlg.enter_accepts = True
+            result = dlg.run()
+            if result is None:
+                return
+
+            self.set_mountpoint(p, result[0][2])
+
+    def act_part_unuse(self, table, p):
+        usage = self.used_as(p)
+        if usage is None:
+            return
+        text = L('Stop using partition %s?') % p.name
+        if utils.YesNo(self.Main, text, '%s\n%s' % (text, usage)):
+            self.unuse(p.name)
 
     def unuse(self, partname):
         if self.Main.bootcode == partname:
@@ -417,8 +360,8 @@ class Parted(Window):
 
         suggestions = [ '/', '/home' ]
         current = 0
-        for k,v in self.Main.fstab:
-            if k == suggestions[current]:
+        for k,v in self.Main.fstab.items():
+            if v['mount'] == suggestions[current]:
                 current += 1
                 if current >= len(suggestions):
                     break
@@ -440,3 +383,32 @@ class Parted(Window):
                    ) + ', '.join(geom.Uncommitted)
             if utils.NoYes(self.Main, L("Commit changes?"), msg):
                 geom.geom_commit_all()
+
+
+def text_entry_table(self, maxlen, win_width, table):
+    return '%s%s    %s [%s]' % (table.name,
+                                ' ' * (maxlen - len(table.name)),
+                                table.scheme,
+                                part.bytes2str(table.size))
+TableActions.entry_text = text_entry_table
+
+def text_entry_free(self, maxlen, win_width, t, beg, sz):
+    return '   * free: (%s)' % part.bytes2str(sz * t.sectorsize)
+FreeActions.entry_text = text_entry_free
+
+def text_entry_partition(self, maxlen, win_width, t, p):
+    bytestr = part.bytes2str(p.bytes_)
+    usage   = self.used_as(p)
+    if usage is None:
+        usage = ''
+    return '  => %s%s%- 14s [%s] %s' % (p.name,
+                                        ' ' * (maxlen - len(p.name)),
+                                        p.partype,
+                                        bytestr,
+                                        usage)
+PartitionActions.entry_text = text_entry_partition
+
+def text_entry_disk(self, maxlen, win_width, provider):
+    size = part.bytes2str(provider.mediasize)
+    return 'disk: %s [%s]' % (provider.name, size)
+DiskActions.entry_text = text_entry_disk
