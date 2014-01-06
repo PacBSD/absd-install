@@ -351,7 +351,7 @@ class Parted(Window):
             self.Main.bootcode = ''
         try:
             del self.Main.fstab[partname]
-        except NameError:
+        except KeyError:
             pass
 
     def __delete_partition(self, partition):
