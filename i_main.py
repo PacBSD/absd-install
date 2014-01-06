@@ -57,8 +57,8 @@ class MainWindow(Window):
         self.height = min(self.Main.size[0] - 1, len(self.entries)+2)
         self.width  = min(self.Main.size[1] - 1, self.longest+4)
 
-        self.win.resize(*self.Main.size)
-        self.win.mvwin(0, 0)
+        self.win.resize(self.height+1, self.width+1)
+        self.center(self.height, self.width)
 
     def tabbed(self):
         self.draw()

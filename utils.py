@@ -240,6 +240,14 @@ class Window(object):
         """Called when a key is pressed."""
         pass
 
+    def center(self, height, width):
+        """Move the window to the center given its current size."""
+        # pylint: disable=invalid-name
+        y, x = self.Main.size
+        y = (y - height) // 2
+        x = (x - width)  // 2
+        self.win.mvwin(y, x)
+
 def yes_no(main, title, question):
     """Shows a 'Yes/No' dialog question."""
     with MsgBox(main, title, question) as dlg:
