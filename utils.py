@@ -1,59 +1,50 @@
+"""
+Utilities module.
+Contains the Window class and some common subclasses.
+Some localized strings, and functions for common key mappings.
+(ie vim/emacs/arrow down/up/left/right key checks, see the isk_* functions).
+"""
+
 import curses
 import string
-from curses.textpad import Textbox, rectangle
+from curses.textpad import rectangle
 
 import gettext
 L = gettext.gettext
 
-more_up   = ' [ ^^^ %s ] ' % L('more')
-more_down = ' [ vvv %s ] ' % L('more')
+MORE_UP   = ' [ ^^^ %s ] ' % L('more')
+MORE_DOWN = ' [ vvv %s ] ' % L('more')
 
-class Size:
-    pass
-
-class Label:
-    pass
-
-def check_field(label, type_, value, allowed):
-    if allowed is None:
-        return (label, type_, value, allowed)
-    if type_ == str:
-        # TODO: dropdown box behavior
-        pass
-    elif type_ == int or type_ == Size:
-        min_, max_ = allowed
-        value = str(max(min_, min(max_, int(value))))
-    return (label, type_, value, allowed)
-
-def is_valid_char(ch, text, position, type_):
-    if type_ == str:
-        return ch in string.printable
-
-    if type_ == Label:
-        return (ch in string.ascii_letters or
-                ch in string.digits        or
-                ch in '_-')
-
-    if type_ == int:
+class Size(object):
+    """A byte-size type for an input field in Dialog."""
+    # pylint: disable=too-few-public-methods
+    @staticmethod
+    def allowed(char, text, position):
+        """common way to express a size is a number with an optional unit
+        suffix like M for Megabytes. Also allow 0x for hex numbers."""
         # 0x prefix allowed:
-        if len(text) > 1 and text[0] == '0' and position == 1 and ch == 'x':
+        if len(text) > 1 and text[0] == '0' and position == 1 and char == 'x':
             return True
-        return ch in string.digits
-
-    if type_ == Size:
-        # 0x prefix allowed:
-        if len(text) > 1 and text[0] == '0' and position == 1 and ch == 'x':
-            return True
-        if ch == ',' or ch == '.':
+        if char == ',' or char == '.':
             # , is stripped and . is allowed
             return True
-        if position == len(text) and ch in 'kMGT':
+        if position == len(text) and char in 'kMGT':
             return True
-        return ch in string.digits
+        return char in string.digits
 
-    return False
+class Label(object):
+    """Label type for the Dialog window. Restricts allowed characters."""
+    # pylint: disable=too-few-public-methods
+    # pylint: disable=unused-argument
+    @staticmethod
+    def allowed(char, unused_text, unused_position):
+        """labels can be [a-zA-Z0-9_]"""
+        return (char in string.ascii_letters or
+                char in string.digits        or
+                char in '_-')
 
 def translate_key(key):
+    """Remove the ValueError from curses.keyname"""
     try:
         return curses.keyname(key)
     except ValueError:
@@ -61,91 +52,128 @@ def translate_key(key):
 
 # vim/emacs/lame key checks:
 def isk_up(key, name):
+    """up-arrow, 'k' or ctrl+P"""
     return key == curses.KEY_UP   or name == b'k' or name == b'^P'
 
 def isk_down(key, name):
+    """down-arrow, 'j' or ctrl+N"""
     return key == curses.KEY_DOWN or name == b'j' or name == b'^N'
 
 def isk_left(key, name):
+    """left-arrow, 'h' or ctrl+B"""
     return key == curses.KEY_LEFT or name == b'h' or name == b'^B'
 
 def isk_right(key, name):
+    """right-arrow, 'l' or ctrl+F"""
     return key == curses.KEY_RIGHT or name == b'l' or name == b'^F'
 
 def isk_home(key, name):
+    """HOME key, 'g' or ctrl+A"""
     return key == curses.KEY_HOME or name == b'g' or name == b'^A'
 
 # the emacs key binding here clashes with isk_scrolldown, make sure you test
 # the more important one first...
 def isk_end(key, name):
+    """END key, 'G' or ctrl+E"""
     return key == curses.KEY_END  or name == b'G' or name == b'^E'
 
-def isk_pageup(key, name):
+def isk_pageup(key, _):
+    """page up key, currently no other variation"""
     return key == curses.KEY_PPAGE
 
-def isk_pagedown(key, name):
+def isk_pagedown(key, _):
+    """page down key, currently no other variation"""
     return key == curses.KEY_NPAGE
 
-def isk_scrollup(key, name):
+def isk_scrollup(_, name):
+    """vim-like up-scrolling with ctrl+Y"""
     return name == b'^Y'
 
-def isk_scrolldown(key, name):
+def isk_scrolldown(_, name):
+    """vim-like down-scrolling with ctrl+E"""
     return name == b'^E'
 
-def isk_tab(key, name):
+def isk_tab(_, name):
+    """ctrl+I is the tab key"""
     return name == b'^I'
 
 def isk_enter(key, name):
-    return key == curses.KEY_ENTER
+    """enter key or ctrl+M"""
+    return key == curses.KEY_ENTER or name == b'^M'
 
 def isk_backspace(key, name):
+    """backspace or ctrl+H"""
     return key == curses.KEY_BACKSPACE or name == b'^H'
 
 def isk_del(key, name):
+    """DEL key or ctrl+D"""
     return key == curses.KEY_DC or name == b'^D'
 
-def isk_del_to_front(key, name):
+def isk_del_to_front(_, name):
+    """emacs-like cut-to-front with ctrl+U"""
     return name == b'^U'
 
-def isk_del_to_end(key, name):
+def isk_del_to_end(_, name):
+    """emacs-like kill-rest-of-line with ctrl+K"""
     return name == b'^K'
 
-def isk_yank(key, name):
+def isk_yank(_, name):
+    """emacs-like yank with ctrl+Y"""
     return name == b'^Y'
 
 def highlight_if(cond):
+    """Return the highlighted background attribute if the condition is true,
+    the normal one otherwise."""
+    # Mostly because the inline 'curses.A_REVERSE if FOO else curses...'
+    # doesn't very much like to fit in the 80 char column limit :P
     if cond:
         return curses.A_REVERSE
     return curses.A_NORMAL
 
 # decorator
-def drawmethod(fn):
-    def f(self, *args, **kwargs):
-        r = fn(self, *args, **kwargs)
+def drawmethod(func):
+    """self.draw() methods want to call win.refresh when they leave, always."""
+    def inner(self, *args, **kwargs):
+        # pylint: disable=missing-docstring
+        result = func(self, *args, **kwargs)
         self.win.refresh()
-        return r
-    return f
+        return result
+    return inner
 
 # decorator
-def redraw(fn):
-    def f(self, *args, **kwargs):
-        r = fn(self, *args, **kwargs)
+def redraw(func):
+    """some methods modify the state and want to call self.draw() after
+    returning regardless of which path they took.
+    This is just code deduplication"""
+    def inner(self, *args, **kwargs):
+        # pylint: disable=missing-docstring
+        result = func(self, *args, **kwargs)
         self.draw()
-        return r
-    return f
+        return result
+    return inner
 
 class Window(object):
-    def __init__(self, Main):
+    """Window baseclass. Creates a curses window, by default intercepts TAB
+    keys, handles input events and declares the default attributes.
+    Provides __enter__ and __exit__ to be used in a 'with' statement.
+    Provides empty draw functions."""
+
+    NO_TAB        = 1
+    ENTER_ACCEPTS = 2
+
+    def __init__(self, Main, tabcount=0):
         self.Main     = Main
         self.result   = None
         self.current  = 0
-        self.tabcount = 0
+        self.tabcount = tabcount
+        self.size     = (5, 5)
         self.win      = curses.newwin(5, 5)
-        self.notab    = False
-
-        self.enter_accepts = False
+        self.flags    = []
 
     def run(self):
+        """Window's entrypoint:
+        calls self.resize, self.draw, and starts the event loop, returns
+        self.result"""
         self.resize()
         self.draw()
         try:
@@ -160,23 +188,25 @@ class Window(object):
         return self
 
     def close(self):
+        """Call the self.before_close hook and destroy the curses window."""
         if self.win is not None:
             self.before_close()
             del self.win
             self.win = None
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, type_, value, traceback):
         self.close()
 
     def __del__(self):
         self.close()
 
     def event_p(self, key, name):
+        """Wraps the event() method to call self.resize and optionally handle
+        TAB keys."""
         if key == curses.KEY_RESIZE:
-            self.Main.resize_event()
             self.resize()
             self.draw()
-        elif not self.notab and isk_tab(key, name):
+        elif Window.NO_TAB not in self.flags and isk_tab(key, name):
             self.tab()
             self.tabbed()
             self.draw()
@@ -185,62 +215,87 @@ class Window(object):
         return True
 
     def tab(self):
+        """Move the cursor through self.tabcount and call self.tabbed."""
         self.current += 1
         if self.current >= self.tabcount:
             self.current = 0
         self.tabbed()
 
     def before_close(self):
+        """Executed when going out of scope, just before destroying the
+        curses window."""
         pass
     def tabbed(self):
+        """Called when the tab key is pressed."""
         pass
     def draw(self):
+        """The draw method."""
         pass
     def resize(self):
+        """Resize hook.
+        Called in the beginning and on terminal resize events.
+        """
+        pass
+    def event(self, key, name):
+        """Called when a key is pressed."""
         pass
 
-def YesNo(Main, title, question):
-    with MsgBox(Main, title, question) as dlg:
-        return dlg.run() == MsgBox.Yes
+def yes_no(main, title, question):
+    """Shows a 'Yes/No' dialog question."""
+    with MsgBox(main, title, question) as dlg:
+        return dlg.run() == MsgBox.YES_BUTTON
 
-def NoYes(Main, title, question):
-    with MsgBox(Main, title, question, buttons=[MsgBox.No, MsgBox.Yes]) as dlg:
-        return dlg.run() == MsgBox.Yes
+def no_yes(main, title, question):
+    """Shows a 'Yes/No' dialog question. With 'No' being the frist and default
+    button."""
+    with MsgBox(main, title, question,
+                buttons=[MsgBox.NO_BUTTON, MsgBox.YES_BUTTON]
+               ) as dlg:
+        return dlg.run() == MsgBox.YES_BUTTON
 
-def Message(Main, title, text):
-    with MsgBox(Main, title, text, buttons=[MsgBox.Ok]) as dlg:
+def message(main, title, text):
+    """Shows a message box with an OK button."""
+    with MsgBox(main, title, text, buttons=[MsgBox.OK_BUTTON]) as dlg:
         dlg.run()
 
-def Confirm(Main, title, question):
-    with MsgBox(Main, title, question,
-                buttons=[MsgBox.Ok, MsgBox.Cancel]
+def confirm(main, title, question):
+    """Shows a confirmation request with OK and Cancel buttons."""
+    with MsgBox(main, title, question,
+                buttons=[MsgBox.OK_BUTTON, MsgBox.CANCEL_BUTTON]
                ) as dlg:
-        return dlg.run() == MsgBox.Ok
+        return dlg.run() == MsgBox.OK_BUTTON
 
 class MsgBox(Window):
-    Yes    = (0, L("Yes"))
-    No     = (1, L("No"))
-    Ok     = (2, L("OK"))
-    Cancel = (3, L("Cancel"))
+    """A Message-Box Window subclass. Declares some buttons that can be shown
+    along with a text message. Buttons default to 'Yes' and 'No'."""
+    YES_BUTTON    = (0, L("Yes"))
+    NO_BUTTON     = (1, L("No"))
+    OK_BUTTON     = (2, L("OK"))
+    CANCEL_BUTTON = (3, L("Cancel"))
 
-    def __init__(self, Main, title, question, buttons=[Yes, No]):
+    def __init__(self, Main, title, question, buttons=[YES_BUTTON, NO_BUTTON]):
+        # pylint: disable=dangerous-default-value
         Window.__init__(self, Main)
-        self.title     = title
-        self.textlines = question.splitlines()
         self.buttons   = buttons
         self.tabcount  = len(buttons)
         self.result    = buttons[0]
-        self.textwidth = 0
-        for line in self.textlines:
-            self.textwidth = max(self.textwidth, len(line))
+
+        textlines = question.splitlines()
+        textwidth = 0
+        for line in textlines:
+            textwidth = max(textwidth, len(line))
+
+        self.content = (title, textlines, textwidth)
+
         self.resize()
 
     def select(self, rel):
+        """Move through the buttons and redraw."""
         self.current += rel
-        if self.current < 0:
-            self.current = self.tabcount-1
-        elif self.current >= self.tabcount:
-            self.current = 0
+        while self.current < 0:
+            self.current += self.tabcount
+        while self.current >= self.tabcount:
+            self.current -= self.tabcount
         self.draw()
 
     def event(self, key, name):
@@ -259,30 +314,29 @@ class MsgBox(Window):
 
     def resize(self):
         Main = self.Main
-        self.fullw = max(40, self.textwidth + 4)
-        self.fullh = 5 + len(self.textlines)
+        width  = max(40, self.content[2] + 4)
+        height = 6 + len(self.content[1])
 
-        self.width  = self.fullw - 2
-        self.height = self.fullh - 2
-        self.x = (Main.size[1] - self.fullw)//2
-        self.y = (Main.size[0] - self.fullh)//2
+        win_x = (Main.size[1] - width)//2
+        win_y = (Main.size[0] - height)//2
 
-        self.win.resize(self.fullh+1, self.fullw+1)
-        self.win.mvwin (self.y,       self.x)
+        self.win.resize(height, width)
+        self.win.mvwin (win_y, win_x)
+        self.size = (height, width)
 
     def draw(self):
-        Main   = self.Main
-        fullw  = self.fullw
-        fullh  = self.fullh
-        width  = self.width
-        height = self.height
+        fullh, fullw  = self.size
+
+        width  = fullw - 2
+        height = fullh - 2
 
         win = self.win
-        rectangle(win, 0, 0, fullh-1, fullw-1)
-        win.addstr(0, 3, '[%s:]' % self.title)
+        rectangle(win, 0, 0, height, fullw-1)
+        win.addstr(0, 3, '[%s:]' % self.content[0])
 
+        # pylint: disable=invalid-name
         y = 1
-        for line in self.textlines:
+        for line in self.content[1]:
             win.hline (y, 1, ' ', width)
             win.addstr(y, 1, line)
             y += 1
@@ -300,14 +354,17 @@ class MsgBox(Window):
         win.refresh()
 
 class Dialog(Window):
+    """
+    A Dialog window contains a list of fields the user can write text into.
+    """
     def __init__(self, Main, title, fields):
         Window.__init__(self, Main)
         self.title  = title
         self.fields = []
         self.fieldlen = 0
-        for f in fields:
-            self.fieldlen = max(self.fieldlen, len(f[0]))
-            self.fields.append((f[0], f[1], str(f[2]), f[3]))
+        for field in fields:
+            self.fieldlen = max(self.fieldlen, len(field[0]))
+            self.fields.append((field[0], field[1], str(field[2]), field[3]))
         self.fieldlen += 2
         self.tabcount = len(fields)+2
 
@@ -317,9 +374,35 @@ class Dialog(Window):
         self.resize()
         self.tabbed()
 
+    @staticmethod
+    def is_valid_char(char, text, position, type_):
+        """Check whether a character can be added at the given position of the
+        given text, assuming the text represents a value of the specified
+        type_, such as a byte-size or a label used for a partition."""
+        if type_ == str:
+            return char in string.printable
+
+        if type_ == Label:
+            return Label.allowed(char, text, position)
+
+        if type_ == int:
+            # 0x prefix allowed:
+            if (len(text) > 1  and position == 1  and
+                text[0] == '0' and (len(text) == 1 or text[1] != 'x') and
+                char == 'x'):
+                return True
+            return char in string.digits
+
+        if type_ == Size:
+            return Size.allowed(char, text, position)
+
+        return False
+
     def event(self, key, name):
+        # pylint: disable=too-many-branches
         if isk_enter(key, name):
-            if self.current == len(self.fields) or self.enter_accepts:
+            if (self.current == len(self.fields)
+                or Window.ENTER_ACCEPTS in self.flags):
                 self.result = self.fields
                 return False
             if self.current == len(self.fields)+1:
@@ -333,11 +416,11 @@ class Dialog(Window):
             return False
         elif self.current < len(self.fields):
             title, type_, value, limit = self.fields[self.current]
-            ch = chr(key)
+            char = chr(key)
 
-            if is_valid_char(ch, value, self.cursor, type_):
+            if self.is_valid_char(char, value, self.cursor, type_):
                 # typing
-                value = value[0:self.cursor] + ch + value[self.cursor:]
+                value = value[0:self.cursor] + char + value[self.cursor:]
                 self.fields[self.current] = (title, type_, value, limit)
                 self.cursor += 1
 
@@ -393,53 +476,67 @@ class Dialog(Window):
             self.draw()
         return True
 
+    @staticmethod
+    def check_field(label, type_, value, allowed):
+        """Get the closest valid value for an input field.
+        Returns the entire tuple for ease of use."""
+        if allowed is None:
+            return (label, type_, value, allowed)
+        if type_ == str:
+            # TODO: dropdown box behavior
+            pass
+        elif type_ == int or type_ == Size:
+            min_, max_ = allowed
+            value = str(max(min_, min(max_, int(value))))
+        return (label, type_, value, allowed)
+
     def tabbed(self):
         if self.current >= len(self.fields):
             return
-        f = self.fields[self.current]
-        f = check_field(*f)
-        self.fields[self.current] = f
-        self.cursor = len(f[2])
+        field = self.fields[self.current]
+        # pylint: disable=star-args
+        field = self.check_field(*field)
+        self.fields[self.current] = field
+        self.cursor = len(field[2])
 
     def resize(self):
         Main = self.Main
-        self.fullw  = 60  + 2
-        self.fullh  = len(self.fields)*3 + 2
+        fullw  = 60  + 2
+        fullh  = len(self.fields)*3 + 2
 
-        self.fullh += 3 # buttons
+        fullh += 3 # buttons
 
-        if self.fullw >= Main.size[1]:
-            self.fullw = Main.size[1] - 4
-        if self.fullh >= Main.size[0]:
-            self.fullh = Main.size[0] - 4
+        if fullw >= Main.size[1]:
+            fullw = Main.size[1] - 4
+        if fullh >= Main.size[0]:
+            fullh = Main.size[0] - 4
 
-        self.width  = self.fullw - 2
-        self.height = self.fullh - 2
+        self.size = (fullh, fullw)
 
-        self.x = (Main.size[1] - self.fullw)//2
-        self.y = (Main.size[0] - self.fullh)//2
+        win_x = (Main.size[1] - fullw)//2
+        win_y = (Main.size[0] - fullh)//2
 
-        self.win.resize(self.fullh+1, self.fullw+1)
-        self.win.mvwin (self.y,       self.x)
+        self.win.resize(fullh+1, fullw+1)
+        self.win.mvwin (win_y, win_x)
 
 
     def draw(self):
-        Main   = self.Main
-        fullw  = self.fullw
-        fullh  = self.fullh
-        width  = self.width
-        height = self.height
+        height, width = self.size
+        height -= 1
+        width  -= 1
 
         win = self.win
-        rectangle(win, 0, 0, fullh-1, fullw-1)
+        rectangle(win, 0, 0, height, width)
         win.addstr(0, 3, '[%s:]' % self.title)
+        width -= 1
 
+        # pylint: disable=invalid-name
         x = 1
         y = 1
         cursor = None
         for i in range(len(self.fields)):
             f = self.fields[i]
-            title, type_, value = f[0], f[1], f[2]
+            title, _, value = f[0], f[1], f[2]
             win.hline (y+0, x, ' ', width)
             win.hline (y+1, x, ' ', width)
             win.hline (y+2, x, ' ', width)
@@ -470,5 +567,6 @@ class Dialog(Window):
             curses.curs_set(0)
         else:
             curses.curs_set(1)
+            # pylint: disable=star-args
             win.move(*cursor)
         win.refresh()

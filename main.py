@@ -1,10 +1,11 @@
 #!/usr/bin/python3
+"""
+Experimental ArchBSD Installation UI.
+"""
 
 # Well, in my VM this does get printed earlier, not as early as I'd like though
 # but good enough...
 print("Loading up installer...")
-
-import part
 
 import utils
 import i_main
@@ -15,12 +16,15 @@ import curses
 import json
 
 def main():
+    """shutup pylint"""
     installer = Installer()
     installer.main()
 
 ###############################################################################
 
 class Installer(object):
+    """Handles saving/reloading of previous settings. Runs the main menu, and
+    keeps a yank buffer and some other data around used throughout the UI."""
     def __init__(self):
         self.home        = os.environ['HOME']
         self.config_file = self.home + '/absd-installer.json'
@@ -28,10 +32,12 @@ class Installer(object):
 
         self.fstab    = {}
         self.bootcode = ''
+        self.size     = (1, 1)
+        self.screen   = None
 
         try:
-            with open(self.config_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+            with open(self.config_file, 'r', encoding='utf-8') as cfgfile:
+                data = json.load(cfgfile)
                 self.fstab    = data['fstab']
                 self.bootcode = data['bootcode']
         except (FileNotFoundError, PermissionError) as inst:
@@ -40,27 +46,32 @@ class Installer(object):
             print("Error in old ~/absd-installer.json file")
 
     def save(self):
+        """Brings the current setup into a JSON-serializable form and stores
+        the data in the user's home."""
         data = {
             'fstab':    self.fstab,
             'bootcode': self.bootcode,
         }
-        with open(self.config_file, 'w', encoding='utf-8') as f:
-            json.dump(data, f, sort_keys=True,
+        with open(self.config_file, 'w', encoding='utf-8') as cfgfile:
+            json.dump(data, cfgfile, sort_keys=True,
                       indent=4, separators=(',', ':'))
-            f.write('\n')
+            cfgfile.write('\n')
 
     def yank_add(self, text):
-        # we might add a cut/paste history at some point
+        """Replaces the yank buffer. Might some day keep a history..."""
         self.yank_buf = text
+
     def yank_get(self):
+        """Retrieve the last yank buffer entry."""
         return self.yank_buf
 
     def main(self):
+        """Main entry point of the installer.
+        Initializes curses, and deals with the KeyboardInterrupt gracefully."""
+
         def exit_hook():
-            try:
-                self.end_gui()
-            except:
-                pass
+            """wrapping self.end_gui for atexit"""
+            self.end_gui()
 
         atexit.register(exit_hook)
         self.screen = curses.initscr()
@@ -79,9 +90,10 @@ class Installer(object):
             # Now that the terminal can actually display text again
             # rethrow the exception
             raise inst
-        part.info()
+        #part.info()
 
     def setup_gui(self):
+        """Initialize default curses settings, and fetches the screen size."""
         curses.start_color()
         curses.savetty()
         curses.noecho()
@@ -90,27 +102,37 @@ class Installer(object):
         self.screen.keypad(True)
         self.resize_event()
 
-    def end_gui(self):
+    @staticmethod
+    def end_gui():
+        """Quit the ncurses GUI and execute 'stty sane' to bring the terminal
+        into a sane state."""
         curses.resetty()
         curses.endwin()
         os.system('stty sane')
 
     def resize_event(self):
+        """Terminal resize hook. Updates the size and refreshes the screen."""
         self.size = self.screen.getmaxyx()
         self.screen.refresh()
 
     def get_key(self):
+        """Used by all UIs to receive an key-press. Also reacts to KEY_RESIZE
+        (terminal resizing) before the current Window deals with the new size.
+        """
         key  = self.screen.getch()
         name = utils.translate_key(key)
         if key == 0x7f:
             key = curses.KEY_BACKSPACE
         elif key == 0x0a:
             key = curses.KEY_ENTER
+        elif key == curses.KEY_RESIZE:
+            self.resize_event()
         return (key, name)
 
     def run(self):
-        with i_main.MainWindow(self) as main:
-            main.run()
+        """Spawns the main GUI."""
+        with i_main.MainWindow(self) as mainwin:
+            mainwin.run()
 
 ###############################################################################
 

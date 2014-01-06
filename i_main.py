@@ -1,6 +1,28 @@
+"""
+ArchBSD Installer main menu.
+
+Allows the user to choose between the steps required to install the system,
+one after the other. The user may skip a step, for instance if they already
+did something manually.
+
+The currently provided steps are:
+
+    1) Keyboard Selection
+         This is mostly useful if we decide to run the installer automatically
+         or if the users doesn't yet know how to use kbdmap. It might however
+         be better to start the iso off with an optional keyboard selection
+         dialog.
+
+    2) Partitioning
+         Shows the partition editor. This mostly deals with boot and UFS
+         partitions. ZFS support is minimal as it is quite complex. A basic ZFS
+         configuration can be created (TODO), but no complex operations will be
+         provided as a we assume that a user who knows about them is also
+         capable of using the zpool/zfs CLI tools.
+"""
+
 import utils
-import curses
-from curses.textpad import Textbox, rectangle
+from curses.textpad import rectangle
 
 import gettext
 L = gettext.gettext
@@ -10,20 +32,24 @@ import i_parted
 
 Window = utils.Window
 class MainWindow(Window):
+    """Main window"""
     def __init__(self, Main):
         Window.__init__(self, Main)
 
+        self.width  = 0
+        self.height = 0
+
         self.title = L('Installer Main Menu')
         self.entries = [
-            (L('Keyboard Selection'),  lambda: self.show_keymaps()),
-            (L('Partition Editor'),    lambda: self.show_parted() ),
+            (L('Keyboard Selection'),  self.show_keymaps          ),
+            (L('Partition Editor'),    self.show_parted           ),
             (L('Quit without saving'), lambda: self.exit(False)   ),
             (L('Exit and Save'),       lambda: self.exit(True)    ),
         ]
         self.tabcount = len(self.entries)
         self.longest = len(self.title)+6
-        for t,f in self.entries:
-            self.longest = max(self.longest, len(t))
+        for title, _ in self.entries:
+            self.longest = max(self.longest, len(title))
 
         self.resize()
 
@@ -61,24 +87,29 @@ class MainWindow(Window):
         return True
 
     def action(self):
+        """Execute the selected action."""
         _, action = self.entries[self.current]
-        r = action()
+        result = action()
         self.Main.screen.erase()
         self.Main.screen.refresh()
-        return r
+        return result
 
     def exit(self, save):
+        """Exit the main dialog and optionally call the installer's save()
+        method."""
         if save:
             self.Main.save()
         return False
 
     def show_keymaps(self):
+        """Show the keyboard selection window."""
         with i_keyboard.Keyboard(self.Main) as keyboard:
             if keyboard.run() is None:
                 return False
         return True
 
     def show_parted(self):
+        """Show the partition editor."""
         with i_parted.Parted(self.Main) as parted:
             if parted.run() is None:
                 return False
@@ -86,11 +117,11 @@ class MainWindow(Window):
 
     @utils.drawmethod
     def draw(self):
-        Main   = self.Main
         width  = self.width
         height = self.height
         win    = self.win
 
+        # pylint: disable=invalid-name
         y = 1
         x = 2
         for i in range(self.tabcount):
@@ -98,5 +129,5 @@ class MainWindow(Window):
             win.addstr(y, x, text, utils.highlight_if(i == self.current))
             y += 1
 
-        rectangle(win, 0, 0, self.height-1, width)
+        rectangle(win, 0, 0, height-1, width)
         win.addstr(0, 3, '[%s]' % self.title)
