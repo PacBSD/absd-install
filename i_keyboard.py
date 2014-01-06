@@ -4,6 +4,7 @@ Choose a keyboard from the index database found in:
 /usr/share/syscons/keymaps/INDEX.keymaps
 """
 
+import os
 import utils
 import curses
 from curses.textpad import rectangle
@@ -11,7 +12,8 @@ from curses.textpad import rectangle
 import gettext
 L = gettext.gettext
 
-INDEX_FILE = '/usr/share/syscons/keymaps/INDEX.keymaps'
+KEYMAP_PATH = '/usr/share/syscons/keymaps'
+INDEX_FILE  = KEYMAP_PATH + '/INDEX.keymaps'
 
 Window = utils.Window
 class Keyboard(Window):
@@ -114,7 +116,7 @@ class Keyboard(Window):
             self.tab()
 
         elif utils.isk_enter(key, name):
-            self.action()
+            self.__action()
             return False
 
         return True
@@ -122,9 +124,13 @@ class Keyboard(Window):
     def tabbed(self):
         self.draw()
 
-    def action(self):
+    def __action(self):
         """TODO: Set the keymap if OK was pressed."""
-        pass
+        if self.current != 0:
+            return
+        filename, _ = self.entries[self.kbd_pos]
+        command     = '/usr/sbin/kbdmap "%s/%s.kbd"' % (KEYMAP_PATH, filename)
+        os.system(command)
 
     @utils.drawmethod
     def draw(self):

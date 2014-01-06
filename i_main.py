@@ -82,11 +82,11 @@ class MainWindow(Window):
             self.current = maxpos
 
         elif utils.isk_enter(key, name):
-            return self.action()
+            return self.__action()
 
         return True
 
-    def action(self):
+    def __action(self):
         """Execute the selected action."""
         _, action = self.entries[self.current]
         result = action()
