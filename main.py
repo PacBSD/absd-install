@@ -113,6 +113,7 @@ class Installer(object):
     def resize_event(self):
         """Terminal resize hook. Updates the size and refreshes the screen."""
         self.size = self.screen.getmaxyx()
+        self.screen.clear()
         self.screen.refresh()
 
     def get_key(self):

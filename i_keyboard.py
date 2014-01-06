@@ -97,10 +97,10 @@ class Keyboard(Window):
             self.scroll = max(self.scroll-1, 0)
 
         elif utils.isk_pagedown(key, name):
-            if self.kbd_pos != self.scroll + self.size[0] - 5:
-                self.kbd_pos = self.scroll + self.size[0] - 5
+            if self.kbd_pos != self.scroll + self.size[0] - 4:
+                self.kbd_pos = self.scroll + self.size[0] - 4
             else:
-                self.kbd_pos += self.size[0]-5
+                self.kbd_pos += self.size[0]-4
             self.kbd_pos = min(maxpos, max(0, self.kbd_pos))
 
         elif utils.isk_pageup(key, name):
@@ -138,7 +138,7 @@ class Keyboard(Window):
         #win.addstr(0, 3, '[Keyboard Layout Selection]')
 
         # borders
-        height -= 2
+        height -= 1
         # list line
         button_line = height
         height -= 1
@@ -168,15 +168,16 @@ class Keyboard(Window):
             y      += 1
 
         y = button_line
+        win.hline(y, x, ' ', width)
         win.addstr(y, x, L('[ OK ]'),   utils.highlight_if(self.current == 0))
         x += len(L('[ OK ]')) + 2
         win.addstr(y, x, L('[ Skip ]'), utils.highlight_if(self.current == 1))
 
         height = self.size[0]
-        rectangle(win, 0, 0, height-1, width)
+        rectangle(win, 0, 0, height, width)
         win.addstr(0, 3, '[%s]' % L('Keyboard Layout Selection'))
         # scrollability indicator
         if self.scroll > 0:
             win.addstr(0,        width - 16, utils.MORE_UP)
         if self.scroll + height < count:
-            win.addstr(height-3, width - 16, utils.MORE_DOWN)
+            win.addstr(height-2, width - 16, utils.MORE_DOWN)
