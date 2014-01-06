@@ -110,6 +110,27 @@ def isk_del_to_end(key, name):
 def isk_yank(key, name):
     return name == b'^Y'
 
+def highlight_if(cond):
+    if cond:
+        return curses.A_REVERSE
+    return curses.A_NORMAL
+
+# decorator
+def drawmethod(fn):
+    def f(self, *args, **kwargs):
+        r = fn(self, *args, **kwargs)
+        self.win.refresh()
+        return r
+    return f
+
+# decorator
+def redraw(fn):
+    def f(self, *args, **kwargs):
+        r = fn(self, *args, **kwargs)
+        self.draw()
+        return r
+    return f
+
 class Window(object):
     def __init__(self, Main):
         self.Main     = Main
@@ -268,10 +289,9 @@ class MsgBox(Window):
 
         x = 1
         for i in range(self.tabcount):
-            attr = curses.A_REVERSE if self.current == i else curses.A_NORMAL
             text = self.buttons[i][1]
             rectangle(win, y, x, y+2, x+len(text)+1)
-            win.addstr(y+1, x+1, text, attr)
+            win.addstr(y+1, x+1, text, highlight_if(self.current == i))
             x += len(text)+3
 
         win.refresh()
@@ -432,23 +452,15 @@ class Dialog(Window):
         win.hline(y+1, x, ' ', width)
         win.hline(y+2, x, ' ', width)
 
-        if self.current == len(self.fields):
-            attr = curses.A_REVERSE
-        else:
-            attr = curses.A_NORMAL
-
         # OK button
         rectangle(win, y, x, y+2, x+9)
+        attr = highlight_if(self.current == len(self.fields))
         win.addstr(y+1, x+1, '   OK   ', attr)
-
-        if self.current == len(self.fields)+1:
-            attr = curses.A_REVERSE
-        else:
-            attr = curses.A_NORMAL
 
         x += 10
         # CANCEL button
         rectangle(win, y, x, y+2, x+9)
+        attr = highlight_if(self.current == len(self.fields)+1)
         win.addstr(y+1, x+1, ' CANCEL ', attr)
 
         if cursor is None:

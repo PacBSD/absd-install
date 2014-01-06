@@ -8,6 +8,7 @@ import part
 
 import utils
 import i_parted
+import i_keyboard
 
 import os
 import atexit
@@ -109,8 +110,12 @@ class Installer(object):
         return (key, name)
 
     def run(self):
+        with i_keyboard.Keyboard(self) as keyboard:
+            if keyboard.run() is None:
+                return
         with i_parted.Parted(self) as parted:
-            parted.run()
+            if parted.run() is None:
+                return
 
 ###############################################################################
 

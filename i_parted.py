@@ -29,9 +29,9 @@ Window = utils.Window
 class Parted(Window):
     def __init__(self, Main):
         Window.__init__(self, Main)
-        self.notab = True
+        self.result = True
+        self.notab  = True
 
-        self.Main       = Main
         self.tab_pos    = 0
         self.tab_scroll = 0
 
@@ -68,7 +68,7 @@ class Parted(Window):
     def load(self):
         self.win.clear()
         self.tables, self.unused = part.load()
-        self.tab_entries = [i for i in self.iterate()]
+        self.tab_entries = list(self.iterate())
         self.tab_pos     = min(self.tab_pos, len(self.tab_entries)-1)
         self.set_actions()
 
@@ -151,6 +151,7 @@ class Parted(Window):
     def entry_text(self, e, width):
         return e[0].entry_text(self, self.tab_longest+2, width, e)
 
+    @utils.drawmethod
     def draw(self):
         Main   = self.Main
         width  = self.width
@@ -195,11 +196,7 @@ class Parted(Window):
                 break
             ent, edata = self.tab_entries[i]
             txt = ent.entry_text(self, self.tab_longest+2, width, *edata)
-            if eindex == selected:
-                attr = curses.A_REVERSE
-            else:
-                attr = curses.A_NORMAL
-            win.addstr(y, x, txt, attr)
+            win.addstr(y, x, txt, utils.highlight_if(eindex == selected))
             eindex += 1
             y      += 1
 
@@ -208,14 +205,8 @@ class Parted(Window):
         y = act_line
         for i in range(len(self.actions)):
             a = self.actions[i][1]
-            if i == self.act_pos:
-                attr = curses.A_REVERSE
-            else:
-                attr = curses.A_NORMAL
-            win.addstr(y, x, a, attr)
+            win.addstr(y, x, a, utils.highlight_if(i == self.act_pos))
             x += len(a) + 2
-
-        win.refresh()
 
     def action(self):
         # see if there's even an action available
