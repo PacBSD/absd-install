@@ -13,13 +13,15 @@ class MainWindow(Window):
     def __init__(self, Main):
         Window.__init__(self, Main)
 
-        self.entries = [(L('Keyboard Selection'), lambda: self.show_keymaps()),
-                        (L('Partition Editor'),   lambda: self.show_parted() ),
-                        (L('Exit'),               lambda: self.exit(False)   ),
-                        (L('Exit and Save'),      lambda: self.exit(True)    ),
-                       ]
+        self.title = L('Installer Main Menu')
+        self.entries = [
+            (L('Keyboard Selection'),  lambda: self.show_keymaps()),
+            (L('Partition Editor'),    lambda: self.show_parted() ),
+            (L('Quit without saving'), lambda: self.exit(False)   ),
+            (L('Exit and Save'),       lambda: self.exit(True)    ),
+        ]
         self.tabcount = len(self.entries)
-        self.longest = 0
+        self.longest = len(self.title)+6
         for t,f in self.entries:
             self.longest = max(self.longest, len(t))
 
@@ -97,4 +99,4 @@ class MainWindow(Window):
             y += 1
 
         rectangle(win, 0, 0, self.height-1, width)
-        win.addstr(0, 3, '[%s]' % L('Installer Main Menu'))
+        win.addstr(0, 3, '[%s]' % self.title)
