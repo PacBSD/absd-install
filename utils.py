@@ -5,6 +5,9 @@ from curses.textpad import Textbox, rectangle
 import gettext
 L = gettext.gettext
 
+more_up   = ' [ ^^^ %s ] ' % L('more')
+more_down = ' [ vvv %s ] ' % L('more')
+
 class Size:
     pass
 

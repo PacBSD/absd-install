@@ -142,9 +142,9 @@ class Keyboard(Window):
 
         # scrollability indicator
         if self.scroll > 0:
-            win.addstr(0, width - 16, ' [ ^^^ more ] ')
+            win.addstr(0,        width - 16, utils.more_up)
         if self.scroll + height < count:
-            win.addstr(height+1, width - 16, ' [ vvv more ] ')
+            win.addstr(height+1, width - 16, utils.more_down)
 
         x = 2
         y = 1
@@ -164,4 +164,4 @@ class Keyboard(Window):
         win.addstr(y, x, L('[ Skip ]'), utils.highlight_if(self.current == 1))
 
         rectangle(win, 0, 0, self.height-1, width)
-        win.addstr(0, 3, '[Keyboard Layout Selection]')
+        win.addstr(0, 3, '[%s]' % L('Keyboard Layout Selection'))

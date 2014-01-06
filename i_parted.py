@@ -163,7 +163,7 @@ class Parted(Window):
         count  = len(self.tab_entries)
 
         rectangle(win, 0, 0, height-1, width)
-        win.addstr(0, 3, '[Partitioning]')
+        win.addstr(0, 3, '[%s]' % L('Partition Editor'))
 
         # -2 for the rectangle borders
         height -= 2
@@ -183,9 +183,9 @@ class Parted(Window):
             self.tab_scroll =  self.tab_pos - height + 1
 
         if self.tab_scroll > 0:
-            win.addstr(0,        width - 16, ' [ ^^^ more ] ')
+            win.addstr(0,        width - 16, utils.more_up)
         if self.tab_scroll + height < count:
-            win.addstr(height+1, width - 16, ' [ vvv more ] ')
+            win.addstr(height+1, width - 16, utils.more_down)
 
         x = 1
         y = 1

@@ -7,8 +7,7 @@ print("Loading up installer...")
 import part
 
 import utils
-import i_parted
-import i_keyboard
+import i_main
 
 import os
 import atexit
@@ -71,7 +70,7 @@ class Installer(object):
             self.run()
             atexit.unregister(exit_hook)
             exit_hook()
-            self.save()
+            #self.save()
         except KeyboardInterrupt:
             pass
         except Exception as inst:
@@ -110,12 +109,8 @@ class Installer(object):
         return (key, name)
 
     def run(self):
-        with i_keyboard.Keyboard(self) as keyboard:
-            if keyboard.run() is None:
-                return
-        with i_parted.Parted(self) as parted:
-            if parted.run() is None:
-                return
+        with i_main.MainWindow(self) as main:
+            main.run()
 
 ###############################################################################
 
