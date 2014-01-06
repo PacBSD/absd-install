@@ -172,10 +172,11 @@ class Keyboard(Window):
         x += len(L('[ OK ]')) + 2
         win.addstr(y, x, L('[ Skip ]'), utils.highlight_if(self.current == 1))
 
+        height = self.size[0]
         rectangle(win, 0, 0, height-1, width)
         win.addstr(0, 3, '[%s]' % L('Keyboard Layout Selection'))
         # scrollability indicator
         if self.scroll > 0:
             win.addstr(0,        width - 16, utils.MORE_UP)
         if self.scroll + height < count:
-            win.addstr(height+1, width - 16, utils.MORE_DOWN)
+            win.addstr(height-3, width - 16, utils.MORE_DOWN)
