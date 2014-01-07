@@ -161,8 +161,8 @@ class Window(object):
     NO_TAB        = 1
     ENTER_ACCEPTS = 2
 
-    def __init__(self, Main, tabcount=0):
-        self.Main     = Main
+    def __init__(self, app, tabcount=0):
+        self.app      = app
         self.result   = None
         self.current  = 0
         self.tabcount = tabcount
@@ -177,7 +177,7 @@ class Window(object):
         self.resize()
         self.draw()
         try:
-            while self.event_p(*self.Main.get_key()):
+            while self.event_p(*self.app.get_key()):
                 pass
         except KeyboardInterrupt:
             self.result = None
@@ -243,7 +243,7 @@ class Window(object):
     def center(self, height, width):
         """Move the window to the center given its current size."""
         # pylint: disable=invalid-name
-        y, x = self.Main.size
+        y, x = self.app.size
         y = (y - height) // 2
         x = (x - width)  // 2
         self.win.mvwin(y, x)
@@ -281,9 +281,9 @@ class MsgBox(Window):
     OK_BUTTON     = (2, L("OK"))
     CANCEL_BUTTON = (3, L("Cancel"))
 
-    def __init__(self, Main, title, question, buttons=[YES_BUTTON, NO_BUTTON]):
+    def __init__(self, app, title, question, buttons=[YES_BUTTON, NO_BUTTON]):
         # pylint: disable=dangerous-default-value
-        Window.__init__(self, Main)
+        Window.__init__(self, app)
         self.buttons   = buttons
         self.tabcount  = len(buttons)
         self.result    = buttons[0]
@@ -321,12 +321,12 @@ class MsgBox(Window):
         return True
 
     def resize(self):
-        Main = self.Main
+        app = self.app
         width  = max(40, self.content[2] + 4)
         height = 6 + len(self.content[1])
 
-        win_x = (Main.size[1] - width)//2
-        win_y = (Main.size[0] - height)//2
+        win_x = (app.size[1] - width)//2
+        win_y = (app.size[0] - height)//2
 
         self.win.resize(height, width)
         self.win.mvwin (win_y, win_x)
@@ -365,8 +365,8 @@ class Dialog(Window):
     """
     A Dialog window contains a list of fields the user can write text into.
     """
-    def __init__(self, Main, title, fields):
-        Window.__init__(self, Main)
+    def __init__(self, app, title, fields):
+        Window.__init__(self, app)
         self.title  = title
         self.fields = []
         self.fieldlen = 0
@@ -463,20 +463,20 @@ class Dialog(Window):
 
             elif isk_del_to_front(key, name):
                 # delete to the beginning of the line
-                self.Main.yank_add(value[:self.cursor])
+                self.app.yank_add(value[:self.cursor])
                 value = value[self.cursor:]
                 self.fields[self.current] = (title, type_, value, limit)
                 self.cursor = 0
 
             elif isk_del_to_end(key, name):
                 # delete to the beginning of the line
-                self.Main.yank_add(value[self.cursor:])
+                self.app.yank_add(value[self.cursor:])
                 value = value[:self.cursor]
                 self.fields[self.current] = (title, type_, value, limit)
 
             elif isk_yank(key, name):
                 # paste from the yank buffer
-                inner = self.Main.yank_get()
+                inner = self.app.yank_get()
                 value = value[0:self.cursor] + inner + value[self.cursor:]
                 self.cursor += len(inner)
                 self.fields[self.current] = (title, type_, value, limit)
@@ -508,21 +508,21 @@ class Dialog(Window):
         self.cursor = len(field[2])
 
     def resize(self):
-        Main = self.Main
+        app = self.app
         fullw  = 60  + 2
         fullh  = len(self.fields)*3 + 2
 
         fullh += 3 # buttons
 
-        if fullw >= Main.size[1]:
-            fullw = Main.size[1] - 4
-        if fullh >= Main.size[0]:
-            fullh = Main.size[0] - 4
+        if fullw >= app.size[1]:
+            fullw = app.size[1] - 4
+        if fullh >= app.size[0]:
+            fullh = app.size[0] - 4
 
         self.size = (fullh, fullw)
 
-        win_x = (Main.size[1] - fullw)//2
-        win_y = (Main.size[0] - fullh)//2
+        win_x = (app.size[1] - fullw)//2
+        win_y = (app.size[0] - fullh)//2
 
         self.win.resize(fullh+1, fullw+1)
         self.win.mvwin (win_y, win_x)

@@ -5,22 +5,23 @@ Choose a keyboard from the index database found in:
 """
 
 import os
-import utils
 import curses
 from curses.textpad import rectangle
 
 import gettext
 L = gettext.gettext
 
+from . import utils
+
 KEYMAP_PATH = '/usr/share/syscons/keymaps'
 INDEX_FILE  = KEYMAP_PATH + '/INDEX.keymaps'
 
 Window = utils.Window
-class Keyboard(Window):
+class KeyboardSelector(Window):
     """Keyboard selection window."""
 
-    def __init__(self, Main):
-        Window.__init__(self, Main, tabcount=2)
+    def __init__(self, app):
+        Window.__init__(self, app, tabcount=2)
         self.result = True
         self.kbd_pos  = -1
         self.scroll   =  0
@@ -66,8 +67,8 @@ class Keyboard(Window):
                 cnt += 1
 
     def resize(self):
-        height = min(self.Main.size[0] - 1, len(self.entries))
-        width  = min(self.Main.size[1] - 1, self.longest+4)
+        height = min(self.app.size[0] - 1, len(self.entries))
+        width  = min(self.app.size[1] - 1, self.longest+4)
         self.size = (height, width)
         self.win.resize(height+1, width+1)
         self.center(*self.size)

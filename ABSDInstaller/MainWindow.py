@@ -21,20 +21,19 @@ The currently provided steps are:
          capable of using the zpool/zfs CLI tools.
 """
 
-import utils
 from curses.textpad import rectangle
 
 import gettext
 L = gettext.gettext
 
-import i_keyboard
-import i_parted
+from . import utils
+from .KeyboardSelector import KeyboardSelector
+from .PartitionEditor  import PartitionEditor
 
-Window = utils.Window
-class MainWindow(Window):
+class MainWindow(utils.Window):
     """Main window"""
-    def __init__(self, Main):
-        Window.__init__(self, Main)
+    def __init__(self, app):
+        utils.Window.__init__(self, app)
 
         self.width  = 0
         self.height = 0
@@ -54,8 +53,8 @@ class MainWindow(Window):
         self.resize()
 
     def resize(self):
-        self.height = min(self.Main.size[0] - 1, len(self.entries)+2)
-        self.width  = min(self.Main.size[1] - 1, self.longest+4)
+        self.height = min(self.app.size[0] - 1, len(self.entries)+2)
+        self.width  = min(self.app.size[1] - 1, self.longest+4)
 
         self.win.resize(self.height+1, self.width+1)
         self.center(self.height, self.width)
@@ -90,27 +89,27 @@ class MainWindow(Window):
         """Execute the selected action."""
         _, action = self.entries[self.current]
         result = action()
-        self.Main.screen.erase()
-        self.Main.screen.refresh()
+        self.app.screen.erase()
+        self.app.screen.refresh()
         return result
 
     def exit(self, save):
         """Exit the main dialog and optionally call the installer's save()
         method."""
         if save:
-            self.Main.save()
+            self.app.save()
         return False
 
     def show_keymaps(self):
         """Show the keyboard selection window."""
-        with i_keyboard.Keyboard(self.Main) as keyboard:
+        with KeyboardSelector(self.app) as keyboard:
             if keyboard.run() is None:
                 return False
         return True
 
     def show_parted(self):
         """Show the partition editor."""
-        with i_parted.Parted(self.Main) as parted:
+        with PartitionEditor(self.app) as parted:
             if parted.run() is None:
                 return False
         return True

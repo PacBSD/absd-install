@@ -2,15 +2,14 @@
 ArchBSD Partition Editor UI.
 """
 
-import part
-import utils
-from geom import geom
-
 import curses
 from curses.textpad import rectangle
 
 import gettext
 L = gettext.gettext
+
+from . import utils, part
+from geom import geom
 
 class Entry(object):
     """A Partition entry. Has a set of allowed actions, a default action,
@@ -34,12 +33,12 @@ DiskActions      = Entry([('act_disk_setup',    L("Setup Partition Table"))])
 # pylint: enable=invalid-name
 
 Window = utils.Window
-class Parted(Window):
+class PartitionEditor(Window):
     """Partition editor window class."""
     # pylint: disable=too-many-instance-attributes
 
-    def __init__(self, Main):
-        Window.__init__(self, Main)
+    def __init__(self, app):
+        Window.__init__(self, app)
         self.result = True
         self.flags.append(Window.NO_TAB)
 
@@ -61,9 +60,9 @@ class Parted(Window):
         self.resize()
 
     def resize(self):
-        self.height = self.Main.size[0] - 1
-        self.width  = self.Main.size[1] - 1
-        self.win.resize(*self.Main.size)
+        self.height = self.app.size[0] - 1
+        self.width  = self.app.size[1] - 1
+        self.win.resize(*self.app.size)
         self.win.mvwin(0, 0)
 
     def __iterate(self):
@@ -258,16 +257,16 @@ class Parted(Window):
         text = ((L("Do you want to destroy %s?\n") % table.name)
                + L("WARNING: THIS OPERATION CANNOT BE UNDONE!")
                )
-        if utils.no_yes(self.Main, L("Destroy Table?"), text):
+        if utils.no_yes(self.app, L("Destroy Table?"), text):
             msg = part.destroy_partition_table(table)
             if msg is not None:
-                utils.message(self.Main, L("Error"), msg)
+                utils.message(self.app, L("Error"), msg)
             else:
                 self.__load()
 
     def act_disk_setup(self, provider):
         """Create a partition table: equivalent of gpart create"""
-        with utils.Dialog(self.Main, L('New Partition Table'),
+        with utils.Dialog(self.app, L('New Partition Table'),
                           [('scheme', str, 'GPT', None)]) as dlg:
             dlg.flags.append(Window.ENTER_ACCEPTS)
             result = dlg.run()
@@ -275,7 +274,7 @@ class Parted(Window):
                 return
             msg = part.create_partition_table(provider, result[0][2])
             if msg is not None:
-                utils.message(self.Main, L("Error"), msg)
+                utils.message(self.app, L("Error"), msg)
             else:
                 self.__load()
 
@@ -285,7 +284,7 @@ class Parted(Window):
         start *= table.sectorsize
         size  *= table.sectorsize
         partype = geom.partition_type_for(table.scheme, 'freebsd-ufs')
-        with utils.Dialog(self.Main, L('New Partition'),
+        with utils.Dialog(self.app, L('New Partition'),
                           [('label', utils.Label, '',      None),
                            ('start', utils.Size,  start,   (0, size)),
                            ('size',  utils.Size,  size,    (minsz, size)),
@@ -304,7 +303,7 @@ class Parted(Window):
             usize  = min(usize,  size)
             msg = part.create_partition(table, label, ustart, usize, type_)
             if msg is not None:
-                utils.message(self.Main, L("Error"), msg)
+                utils.message(self.app, L("Error"), msg)
             else:
                 self.__load()
 
@@ -313,17 +312,17 @@ class Parted(Window):
         text = ((L("Do you want to delete partition %s?\n") % partition.name)
                + L("WARNING: THIS OPERATION CANNOT BE UNDONE!")
                )
-        if utils.no_yes(self.Main, L("Delete Partition?"), text):
+        if utils.no_yes(self.app, L("Delete Partition?"), text):
             msg = self.__delete_partition(partition)
             if msg is not None:
-                utils.message(self.Main, L("Error"), msg)
+                utils.message(self.app, L("Error"), msg)
             else:
                 self.__load()
 
     def act_part_use(self, _, partition):
         """Set a partition to be used: its mountpoint or bootcode property."""
         point = self.suggest_mountpoint(partition)
-        with utils.Dialog(self.Main, L('Use Partition %s') % partition.name,
+        with utils.Dialog(self.app, L('Use Partition %s') % partition.name,
                           [('Mountpoint', str, point, None)]
                          ) as dlg:
             dlg.flags.append(Window.ENTER_ACCEPTS)
@@ -341,16 +340,16 @@ class Parted(Window):
         if usage is None:
             return
         text = L('Stop using partition %s?') % partition.name
-        if utils.yes_no(self.Main, text, '%s\n%s' % (text, usage)):
+        if utils.yes_no(self.app, text, '%s\n%s' % (text, usage)):
             self.__unuse(partition.name)
 
     def __unuse(self, partname):
         """Performs the actual task of making a partition not being used as
         a mountpoint or for bootcode installation."""
-        if self.Main.bootcode == partname:
-            self.Main.bootcode = ''
+        if self.app.bootcode == partname:
+            self.app.bootcode = ''
         try:
-            del self.Main.fstab[partname]
+            del self.app.fstab[partname]
         except KeyError:
             pass
 
@@ -364,9 +363,9 @@ class Parted(Window):
     def used_as(self, partition):
         """Get a textual representation of what the partition is being used as,
         or None if it's not being used."""
-        fstab = self.Main.fstab.get(partition.name, None)
+        fstab = self.app.fstab.get(partition.name, None)
         if fstab is None:
-            if self.Main.bootcode == partition.name:
+            if self.app.bootcode == partition.name:
                 return '<bootcode>'
             else:
                 return None
@@ -383,10 +382,10 @@ class Parted(Window):
             return self.__unuse(partition.name)
 
         if point == '*bootcode':
-            self.Main.bootcode = partition.name
+            self.app.bootcode = partition.name
             return
 
-        self.Main.fstab[partition.name] = {
+        self.app.fstab[partition.name] = {
             'mount': point
         }
 
@@ -415,13 +414,13 @@ class Parted(Window):
         if partition.partype == 'freebsd-boot':
             return '*bootcode'
 
-        old = self.Main.fstab.get(partition.name, None)
+        old = self.app.fstab.get(partition.name, None)
         if old is not None:
             return old['mount']
 
         suggestions = [ '/', '/home' ]
         current = 0
-        for _, value in self.Main.fstab.items():
+        for _, value in self.app.fstab.items():
             if value['mount'] == suggestions[current]:
                 current += 1
                 if current >= len(suggestions):
@@ -444,7 +443,7 @@ class Parted(Window):
         if len(geom.Uncommitted):
             msg = L("Do you want to commit your changes"
                     " to the following disks?\n") + ', '.join(geom.Uncommitted)
-            if utils.no_yes(self.Main, L("Commit changes?"), msg):
+            if utils.no_yes(self.app, L("Commit changes?"), msg):
                 geom.geom_commit_all()
 
 
