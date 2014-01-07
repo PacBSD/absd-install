@@ -14,134 +14,137 @@ zpool_iter   = POINTER(c_void_p)
 zpool_iter_f = CFUNCTYPE(c_int, zpool_handle, c_void_p)
 zfs_iter_f   = CFUNCTYPE(c_int, zfs_handle, c_void_p)
 
-class nvpair(Structure):
+class nvpair_s(Structure):
     _fields_ = [('nvp_size',       c_int32),
                 ('nvp_name_sz',    c_int16),
                 ('_nvp_reserve',   c_int16),
                 ('nvp_value_elem', c_int32),
                 ('nvp_type',       c_int), # data_type_t enum
                ]
-nvpair_p = POINTER(nvpair)
+nvpair_p = POINTER(nvpair_s)
 
-class nvlist(Structure):
+class nvlist_s(Structure):
     _fields_ = [('nvl_version', c_int32),
                 ('nvl_nvflag',  c_uint32),
                 ('nvl_priv',    c_uint64), # they "call" that a pointer...
                 ('nvl_flag',    c_uint32),
                 ('nvl_pad',     c_int32),
                ]
-nvlist_p = POINTER(nvlist)
+nvlist_p = POINTER(nvlist_s)
 
 boolean_t = c_int
 
-ZFS_TYPE_FILESYSTEM = 0x1
-ZFS_TYPE_SNAPSHOT   = 0x2
-ZFS_TYPE_VOLUME     = 0x4
-ZFS_TYPE_POOL       = 0x8
+class ZFS_TYPE(object):
+    FILESYSTEM = 0x1
+    SNAPSHOT   = 0x2
+    VOLUME     = 0x4
+    DATASET    = FILESYSTEM | VOLUME | SNAPSHOT
+    POOL       = 0x8
 
-ZFS_TYPE_DATASET = ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME | ZFS_TYPE_SNAPSHOT
-
-def make_enum(lst):
-    G = globals()
+def make_enum(cls, lst):
     for i in range(len(lst)):
-        G[lst[i]] = i
+        setattr(cls, lst[i], i)
 
-make_enum(["ZFS_PROP_TYPE",
-           "ZFS_PROP_CREATION",
-           "ZFS_PROP_USED",
-           "ZFS_PROP_AVAILABLE",
-           "ZFS_PROP_REFERENCED",
-           "ZFS_PROP_COMPRESSRATIO",
-           "ZFS_PROP_MOUNTED",
-           "ZFS_PROP_ORIGIN",
-           "ZFS_PROP_QUOTA",
-           "ZFS_PROP_RESERVATION",
-           "ZFS_PROP_VOLSIZE",
-           "ZFS_PROP_VOLBLOCKSIZE",
-           "ZFS_PROP_RECORDSIZE",
-           "ZFS_PROP_MOUNTPOINT",
-           "ZFS_PROP_SHARENFS",
-           "ZFS_PROP_CHECKSUM",
-           "ZFS_PROP_COMPRESSION",
-           "ZFS_PROP_ATIME",
-           "ZFS_PROP_DEVICES",
-           "ZFS_PROP_EXEC",
-           "ZFS_PROP_SETUID",
-           "ZFS_PROP_READONLY",
-           "ZFS_PROP_ZONED",
-           "ZFS_PROP_SNAPDIR",
-           "ZFS_PROP_ACLMODE",
-           "ZFS_PROP_ACLINHERIT",
-           "ZFS_PROP_CREATETXG",    #/* not exposed to the user */
-           "ZFS_PROP_NAME",         #/* not exposed to the user */
-           "ZFS_PROP_CANMOUNT",
-           "ZFS_PROP_ISCSIOPTIONS", #/* not exposed to the user */
-           "ZFS_PROP_XATTR",
-           "ZFS_PROP_NUMCLONES",    #/* not exposed to the user */
-           "ZFS_PROP_COPIES",
-           "ZFS_PROP_VERSION",
-           "ZFS_PROP_UTF8ONLY",
-           "ZFS_PROP_NORMALIZE",
-           "ZFS_PROP_CASE",
-           "ZFS_PROP_VSCAN",
-           "ZFS_PROP_NBMAND",
-           "ZFS_PROP_SHARESMB",
-           "ZFS_PROP_REFQUOTA",
-           "ZFS_PROP_REFRESERVATION",
-           "ZFS_PROP_GUID",
-           "ZFS_PROP_PRIMARYCACHE",
-           "ZFS_PROP_SECONDARYCACHE",
-           "ZFS_PROP_USEDSNAP",
-           "ZFS_PROP_USEDDS",
-           "ZFS_PROP_USEDCHILD",
-           "ZFS_PROP_USEDREFRESERV",
-           "ZFS_PROP_USERACCOUNTING",#/* not exposed to the user */
-           "ZFS_PROP_STMF_SHAREINFO",#/* not exposed to the user */
-           "ZFS_PROP_DEFER_DESTROY",
-           "ZFS_PROP_USERREFS",
-           "ZFS_PROP_LOGBIAS",
-           "ZFS_PROP_UNIQUE",       #/* not exposed to the user */
-           "ZFS_PROP_OBJSETID",     #/* not exposed to the user */
-           "ZFS_PROP_DEDUP",
-           "ZFS_PROP_MLSLABEL",
-           "ZFS_PROP_SYNC",
-           "ZFS_PROP_REFRATIO",
-           "ZFS_PROP_WRITTEN",
-           "ZFS_PROP_CLONES",
-           "ZFS_PROP_LOGICALUSED",
-           "ZFS_PROP_LOGICALREFERENCED",
-           "ZFS_PROP_INCONSISTENT", #/* not exposed to the user */
-           "ZFS_NUM_PROPS"])
+class ZFS_PROP(object):
+    pass
+make_enum(ZFS_PROP, ["TYPE",
+                     "CREATION",
+                     "USED",
+                     "AVAILABLE",
+                     "REFERENCED",
+                     "COMPRESSRATIO",
+                     "MOUNTED",
+                     "ORIGIN",
+                     "QUOTA",
+                     "RESERVATION",
+                     "VOLSIZE",
+                     "VOLBLOCKSIZE",
+                     "RECORDSIZE",
+                     "MOUNTPOINT",
+                     "SHARENFS",
+                     "CHECKSUM",
+                     "COMPRESSION",
+                     "ATIME",
+                     "DEVICES",
+                     "EXEC",
+                     "SETUID",
+                     "READONLY",
+                     "ZONED",
+                     "SNAPDIR",
+                     "ACLMODE",
+                     "ACLINHERIT",
+                     "CREATETXG",    #/* not exposed to the user */
+                     "NAME",         #/* not exposed to the user */
+                     "CANMOUNT",
+                     "ISCSIOPTIONS", #/* not exposed to the user */
+                     "XATTR",
+                     "NUMCLONES",    #/* not exposed to the user */
+                     "COPIES",
+                     "VERSION",
+                     "UTF8ONLY",
+                     "NORMALIZE",
+                     "CASE",
+                     "VSCAN",
+                     "NBMAND",
+                     "SHARESMB",
+                     "REFQUOTA",
+                     "REFRESERVATION",
+                     "GUID",
+                     "PRIMARYCACHE",
+                     "SECONDARYCACHE",
+                     "USEDSNAP",
+                     "USEDDS",
+                     "USEDCHILD",
+                     "USEDREFRESERV",
+                     "USERACCOUNTING",#/* not exposed to the user */
+                     "STMF_SHAREINFO",#/* not exposed to the user */
+                     "DEFER_DESTROY",
+                     "USERREFS",
+                     "LOGBIAS",
+                     "UNIQUE",       #/* not exposed to the user */
+                     "OBJSETID",     #/* not exposed to the user */
+                     "DEDUP",
+                     "MLSLABEL",
+                     "SYNC",
+                     "REFRATIO",
+                     "WRITTEN",
+                     "CLONES",
+                     "LOGICALUSED",
+                     "LOGICALREFERENCED",
+                     "INCONSISTENT", #/* not exposed to the user */
+                     "PROP_COUNT"])
 
-make_enum(["ZFS_PROP_USERUSED",
-           "ZFS_PROP_USERQUOTA",
-           "ZFS_PROP_GROUPUSED",
-           "ZFS_PROP_GROUPQUOTA",
-           "ZFS_NUM_USERQUOTA_PROPS"])
+#make_enum(["ZFS_PROP_USERUSED",
+#           "ZFS_PROP_USERQUOTA",
+#           "ZFS_PROP_GROUPUSED",
+#           "ZFS_PROP_GROUPQUOTA",
+#           "ZFS_NUM_USERQUOTA_PROPS"])
 
-make_enum(["ZPOOL_PROP_NAME",
-           "ZPOOL_PROP_SIZE",
-           "ZPOOL_PROP_CAPACITY",
-           "ZPOOL_PROP_ALTROOT",
-           "ZPOOL_PROP_HEALTH",
-           "ZPOOL_PROP_GUID",
-           "ZPOOL_PROP_VERSION",
-           "ZPOOL_PROP_BOOTFS",
-           "ZPOOL_PROP_DELEGATION",
-           "ZPOOL_PROP_AUTOREPLACE",
-           "ZPOOL_PROP_CACHEFILE",
-           "ZPOOL_PROP_FAILUREMODE",
-           "ZPOOL_PROP_LISTSNAPS",
-           "ZPOOL_PROP_AUTOEXPAND",
-           "ZPOOL_PROP_DEDUPDITTO",
-           "ZPOOL_PROP_DEDUPRATIO",
-           "ZPOOL_PROP_FREE",
-           "ZPOOL_PROP_ALLOCATED",
-           "ZPOOL_PROP_READONLY",
-           "ZPOOL_PROP_COMMENT",
-           "ZPOOL_PROP_EXPANDSZ",
-           "ZPOOL_PROP_FREEING",
-           "ZPOOL_NUM_PROPS"])
+class ZPOOL_PROP(object):
+    pass
+make_enum(ZPOOL_PROP, ["NAME",
+                       "SIZE",
+                       "CAPACITY",
+                       "ALTROOT",
+                       "HEALTH",
+                       "GUID",
+                       "VERSION",
+                       "BOOTFS",
+                       "DELEGATION",
+                       "AUTOREPLACE",
+                       "CACHEFILE",
+                       "FAILUREMODE",
+                       "LISTSNAPS",
+                       "AUTOEXPAND",
+                       "DEDUPDITTO",
+                       "DEDUPRATIO",
+                       "FREE",
+                       "ALLOCATED",
+                       "READONLY",
+                       "COMMENT",
+                       "EXPANDSZ",
+                       "FREEING",
+                       "PROP_COUNT"])
 
 ZPROP_SRC_NONE = 0x1
 ZPROP_SRC_DEFAULT = 0x2
@@ -247,7 +250,7 @@ def main():
 
     def fs_iter(fs, data):
         print('%s: %s' % (zfs.zfs_get_name(fs).decode('utf-8'),
-                          zfs.zfs_type_to_name(zfs.zfs_get_type(fs)).decode('utf-8')))
+                          zfs.zfs_type_to_name(zfs.zfs_get_type(fs))))
         res = zfs.zfs_iter_children(fs, zfs_iter_f(fs_iter), None)
         return 0
     res = zfs.zfs_iter_root(handle, zfs_iter_f(fs_iter), None)
@@ -256,3 +259,25 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+__all__ = ['zhandle',
+           'zfs_handle',
+           'zpool_handle',
+           'zpool_iter',
+           'zpool_iter_f',
+           'zfs_iter_f',
+           'nvpair_p',
+           'nvlist_p',
+           'boolean_t',
+           'ZFS_TYPE',
+           'ZFS_PROP',
+           'ZPOOL_PROP',
+           'ZPROP_SRC_NONE',
+           'ZPROP_SRC_DEFAULT',
+           'ZPROP_SRC_TEMPORARY',
+           'ZPROP_SRC_LOCAL',
+           'ZPROP_SRC_INHERITED',
+           'ZPROP_SRC_RECEIVED',
+           'ZPROP_SRC_ALL',
+           'zfs', 'nvpair'
+           ]
