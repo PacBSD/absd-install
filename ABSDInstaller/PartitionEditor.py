@@ -23,10 +23,12 @@ class Entry(object):
     #def entry_text(parted, maxlen, win_width, data):
 
 # pylint: disable=invalid-name
-TableActions     = Entry([('act_table_destroy', L("Destroy Partition Table"))])
+TableActions     = Entry([('act_table_destroy', L("Destroy Partition Table")),
+                          ('act_table_boot',    L("Choose Bootcode"))])
 PartitionActions = Entry([('act_part_use',      L("Use")),
                           ('act_part_unuse',    L("Don't use")),
                           ('act_part_delete',   L("Delete Partition")),
+                          ('act_part_boot',     L("Choose Bootcode")),
                          ])
 FreeActions      = Entry([('act_create_part',   L("Create Partition"))])
 DiskActions      = Entry([('act_disk_setup',    L("Setup Partition Table"))])
@@ -264,6 +266,24 @@ class PartitionEditor(Window):
             else:
                 self.__load()
 
+    def __act_bootcode(self, name, suggested):
+        with utils.Dialog(self.app, L('Set bootcode for %s') % name,
+                          [('Bootcode', str, suggested, None)]
+                         ) as dlg:
+            dlg.flags.append(Window.ENTER_ACCEPTS)
+            result = dlg.run()
+            if result is None:
+                return
+            code = result[0][2]
+            if len(code) == 0:
+                code = None
+            self.__set_bootcode(name, code)
+
+    def act_table_boot(self, table):
+        """Set a disk's bootcode"""
+        code = self.suggest_disk_bootcode(table)
+        return self.__act_bootcode(table.name, code)
+
     def act_disk_setup(self, provider):
         """Create a partition table: equivalent of gpart create"""
         with utils.Dialog(self.app, L('New Partition Table'),
@@ -320,7 +340,7 @@ class PartitionEditor(Window):
                 self.__load()
 
     def act_part_use(self, _, partition):
-        """Set a partition to be used: its mountpoint or bootcode property."""
+        """Set a partition's mount point"""
         point = self.suggest_mountpoint(partition)
         with utils.Dialog(self.app, L('Use Partition %s') % partition.name,
                           [('Mountpoint', str, point, None)]
@@ -331,6 +351,11 @@ class PartitionEditor(Window):
                 return
 
             self.__set_mountpoint(partition, result[0][2])
+
+    def act_part_boot(self, _, partition):
+        """Set a partition's bootcode"""
+        code = self.suggest_part_bootcode(partition)
+        return self.__act_bootcode(partition.name, code)
 
     def act_part_unuse(self, _, partition):
         """Ask for confirmation and then calls unuse() on the selected
@@ -364,30 +389,53 @@ class PartitionEditor(Window):
         """Get a textual representation of what the partition is being used as,
         or None if it's not being used."""
         fstab = self.app.fstab.get(partition.name, None)
-        if fstab is None:
-            if self.app.bootcode == partition.name:
-                return '<bootcode>'
-            else:
-                return None
-        else:
+        if fstab is not None:
             return 'mountpoint: %s' % fstab['mount']
+        boot = self.app.bootcode.get(partition.name, None)
+        if boot is not None:
+            return 'bootcode: %s' % boot
         return None
+
+    def __set_bootcode(self, name, code):
+        """Set a partition's or disk's bootcode"""
+        # set then delete, no 'is in' check then required :P (lame I know)
+        self.app.bootcode[name] = code
+        if code is None:
+            del self.app.bootcode[name]
 
     def __set_mountpoint(self, partition, point):
         """Set the mountpoint of a partition. This will cause it to be added
-        to /etc/fstab if necessary.
-        The special value '*bootcode' causes the installer to install bootcode
-        to the partition (gpart bootcode)."""
+        to /etc/fstab if necessary."""
         if point is None or len(point) == 0:
             return self.__unuse(partition.name)
 
         if point == '*bootcode':
-            self.app.bootcode = partition.name
+            code = self.suggest_part_bootcode(partition)
+            self.__set_bootcode(partition.name, code)
             return
 
         self.app.fstab[partition.name] = {
             'mount': point
         }
+
+    def suggest_disk_bootcode(self, table):
+        """Suggest a bootcode file for a disk with a partition table."""
+        bclist = {
+            'GPT': '/boot/pmbr',
+            'MBR': '/boot/mbr',
+            'EBR': '/boot/mbr',
+        }
+        return bclist.get(table.scheme, None)
+
+    def suggest_part_bootcode(self, partition):
+        """Suggest a bootcode file for a partition. Mainly depends on the
+        partition table scheme."""
+        bclist = {
+            'GPT': '/boot/gptboot',
+            'MBR': '/boot/boot',
+            'EBR': '/boot/boot',
+        }
+        return bclist.get(partition.owner.scheme, None)
 
     def suggest_mountpoint(self, partition):
         """Suggest a mountopint for a partition.
@@ -447,13 +495,19 @@ class PartitionEditor(Window):
                 geom.geom_commit_all()
 
 
-def text_entry_table(unused_self, maxlen, unused_win_width, table):
+def text_entry_table(self, maxlen, unused_win_width, table):
     """text representation for a disk with partition table"""
     # pylint: disable=unused-argument
-    return '%s%s    %s [%s]' % (table.name,
-                                ' ' * (maxlen - len(table.name)),
-                                table.scheme,
-                                part.bytes2str(table.size))
+    usage   = self.app.bootcode.get(table.name, None)
+    if usage is not None:
+        usage = 'bootcode: %s' % usage
+    else:
+        usage = ''
+    return '%s%s    %s [%s] %s' % (table.name,
+                                   ' ' * (maxlen - len(table.name)),
+                                   table.scheme,
+                                   part.bytes2str(table.size),
+                                   usage)
 TableActions.entry_text = text_entry_table
 
 def text_entry_free(self, maxlen, win_width, table, beg, size):

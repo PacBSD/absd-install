@@ -19,7 +19,7 @@ class Installer(object):
         self.yank_buf    = ''
 
         self.fstab    = {}
-        self.bootcode = ''
+        self.bootcode = {}
         self.size     = (1, 1)
         self.screen   = None
 
