@@ -1,8 +1,10 @@
 from ctypes import *
 import atexit
 
-#from . import util
-import util
+if __name__ == '__main__':
+    import util
+else:
+    from . import util
 
 zhandle      = POINTER(c_void_p)
 
@@ -173,6 +175,9 @@ zfs_functions = [
         [zhandle, c_char_p, nvlist_p, nvlist_p, nvlist_p]),
     ("zpool_destroy",        c_int,        [zpool_handle, c_char_p]),
     ("zpool_add",            c_int,        [zpool_handle, nvlist_p]),
+    ("zpool_get_config",     nvlist_p,     [zpool_handle, POINTER(nvlist_p)]),
+    ("zpool_vdev_name",      c_char_p,     [zhandle, zpool_handle, nvlist_p,
+                                            boolean_t]),
 
     ("zfs_open",             zfs_handle,   [zhandle, c_char_p, c_int]),
     ("zfs_close",            None,         [zfs_handle]),
@@ -205,6 +210,10 @@ nvpair_functions = [
     ("nvlist_size",       c_int,     [nvlist_p, POINTER(c_size_t), c_int]),
     ("nvlist_remove_all", c_int,     [nvlist_p, c_char_p]),
     ("nvlist_exists",     boolean_t, [nvlist_p, c_char_p]),
+    ("nvlist_lookup_nvlist_array",
+                          c_int ,    [nvlist_p, c_char_p,
+                                      POINTER(POINTER(nvlist_p)),
+                                      POINTER(c_uint)]),
 ]
 
 for k,v in [('nvpair',        nvpair_p),
@@ -244,6 +253,24 @@ def main():
 
     def pool_iter(pool, data):
         print('pool: %s' % zfs.zpool_get_name(pool).decode('utf-8'))
+        config = zfs.zpool_get_config(pool, None)
+        if not bool(config):
+            return 0
+        nvroot = nvlist_p()
+        i = zfs.nvlist_lookup_nvlist(config, b'vdev_tree', byref(nvroot))
+        print("config lookup %i" % i)
+        if i != 0:
+            return 0
+
+        child    = POINTER(nvlist_p)()
+        children = c_uint()
+        zfs.nvlist_lookup_nvlist_array(nvroot, b'children',
+                                       byref(child), byref(children))
+        print("%i children" % children.value)
+        for i in range(children.value):
+            name = zfs.zpool_vdev_name(handle, pool, child[i], False)
+            print(" -> %s" % name.decode('utf-8'))
+
         return 0
 
     res = zfs.zpool_iter(handle, zpool_iter_f(pool_iter), None)

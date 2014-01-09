@@ -1,5 +1,5 @@
 import string
-from geom import geom
+from geom import geom, zfs
 
 def find_cfg(gobj, name):
     for c in gobj.configs():
@@ -75,10 +75,28 @@ class PartitionTable(object):
             table.add(Partition.from_provider(table, p))
         return table
 
+#class ZPool(object):
+#    def __init__(self, name):
+#        self.name = name
+#
+#    @staticmethod
+#    def from_handle(pool):
+#        return ZPool(zfs.zfs.zpool_get_name(pool).decode('utf-8'))
+
 def load():
     tables = []
     used   = []
     unused = []
+
+    #zpools = []
+    #handle = zfs.zfs.libzfs_init()
+    #if bool(handle):
+    #    def pool_iter(pool, _):
+    #        zpools.append(ZPool.from_handle(pool))
+    #        return 0
+    #    zfs.zfs.zpool_iter(handle, zfs.zpool_iter_f(pool_iter), None)
+    #    zfs.zfs.libzfs_fini(handle)
+
     with geom.Mesh() as mesh:
         # first all the used ones
         cl = mesh.find_class(b'PART')
