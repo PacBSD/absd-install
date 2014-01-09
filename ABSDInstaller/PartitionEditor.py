@@ -178,10 +178,6 @@ class PartitionEditor(Window):
             self.__action()
         return True
 
-    def entry_text(self, entry, width):
-        """Format an entry's text representation appropriately."""
-        return entry[0].entry_text(self, self.tab_longest+2, width, entry)
-
     @utils.drawmethod
     def draw(self):
         # pylint: disable=too-many-locals
