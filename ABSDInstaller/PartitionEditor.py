@@ -49,14 +49,14 @@ class PartitionEditor(Window):
         self.tab_entries = []
         self.tab_longest = 0
 
-        self.tables = []
-        self.unused = []
+        self.tables      = []
+        self.unused      = []
 
         self.act_pos     = None
         self.actions     = [ '' ]
 
-        self.width  = 0
-        self.height = 0
+        self.width       = 0
+        self.height      = 0
 
         self.__load()
         self.resize()
