@@ -387,7 +387,7 @@ class PartitionEditor(Window):
         or None if it's not being used."""
         for pool in self.zpools:
             if partition.name in pool.children:
-                return L('part of zpool: %s') % pool.name
+                return 'zpool: %s' % pool.name
         fstab = self.app.fstab.get(partition.name, None)
         if fstab is not None:
             return 'mountpoint: %s' % fstab['mount']
