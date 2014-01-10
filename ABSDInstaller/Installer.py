@@ -2,7 +2,7 @@
 Experimental ArchBSD Installation UI.
 """
 
-from . import utils
+from . import utils, part
 from .MainWindow import MainWindow
 
 import os

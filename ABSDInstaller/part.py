@@ -1,5 +1,6 @@
 import string
 from geom import geom, zfs
+from ctypes import byref, POINTER, c_uint
 
 def find_cfg(gobj, name):
     for c in gobj.configs():
@@ -75,27 +76,68 @@ class PartitionTable(object):
             table.add(Partition.from_provider(table, p))
         return table
 
-#class ZPool(object):
-#    def __init__(self, name):
-#        self.name = name
-#
-#    @staticmethod
-#    def from_handle(pool):
-#        return ZPool(zfs.zfs.zpool_get_name(pool).decode('utf-8'))
+class ZPool(object):
+    def __init__(self, name, children):
+        self.name     = name
+        self.children = children
+
+    @staticmethod
+    def from_handle(zhandle, pool):
+        name = zfs.zfs.zpool_get_name(pool)
+        if not bool(name):
+            return None, L('failed to get zpool name')
+
+        name = name.decode('utf-8')
+
+        config = zfs.zfs.zpool_get_config(pool, None)
+        if not bool(config):
+            return None, (L('failed to get config for zpool %s') % name)
+
+        nvroot = zfs.nvlist_p()
+        res = zfs.zfs.nvlist_lookup_nvlist(config, b'vdev_tree', byref(nvroot))
+        if res != 0:
+            return None, (L('failed to get vdev tree for pool %s') % name)
+
+        children = ZPool.__children(zhandle, pool, nvroot)
+
+        return ZPool(name, children), None
+
+    @staticmethod
+    def __children(zhandle, pool, nvroot):
+        child    = POINTER(zfs.nvlist_p)()
+        children = c_uint()
+        zfs.zfs.nvlist_lookup_nvlist_array(nvroot, b'children',
+                                           byref(child), byref(children))
+
+        childlist = []
+        for i in range(children.value):
+            name = zfs.zfs.zpool_vdev_name(zhandle, pool, child[i], False)
+            if not bool(name):
+                continue
+            childlist.append(name.decode('utf-8'))
+            childlist.extend(ZPool.__children(zhandle, pool, child[i]))
+
+        return childlist
 
 def load():
     tables = []
     used   = []
     unused = []
+    errors = []
 
-    #zpools = []
-    #handle = zfs.zfs.libzfs_init()
-    #if bool(handle):
-    #    def pool_iter(pool, _):
-    #        zpools.append(ZPool.from_handle(pool))
-    #        return 0
-    #    zfs.zfs.zpool_iter(handle, zfs.zpool_iter_f(pool_iter), None)
-    #    zfs.zfs.libzfs_fini(handle)
+    zpools = []
+    zhandle = zfs.zfs.libzfs_init()
+    if bool(zhandle):
+        def pool_iter(pool, _):
+            obj, err = ZPool.from_handle(zhandle, pool)
+            if obj is not None:
+                zpools.append(obj)
+                used.extend(obj.children)
+            else:
+                errors.append(err)
+            return 0
+        zfs.zfs.zpool_iter(zhandle, zfs.zpool_iter_f(pool_iter), None)
+        zfs.zfs.libzfs_fini(zhandle)
 
     with geom.Mesh() as mesh:
         # first all the used ones
@@ -110,7 +152,7 @@ def load():
             if cl.name == 'PART':
                 continue
             load_class(cl, used, unused)
-    return tables, unused
+    return tables, unused, zpools
 
 def load_class(cl, used, unused):
     for g in cl.geoms():
@@ -121,7 +163,9 @@ def load_class(cl, used, unused):
             if '/' in p.name:
                 # this is a partition...
                 continue
-            if p.name in used or p.name in unused:
+            if p.name in used:
+                continue
+            if next((x for x in unused if x.name == p.name), None) is not None:
                 continue
             unused.append(p)
 

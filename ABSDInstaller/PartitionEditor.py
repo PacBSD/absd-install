@@ -51,6 +51,7 @@ class PartitionEditor(Window):
 
         self.tables      = []
         self.unused      = []
+        self.zpools      = []
 
         self.act_pos     = None
         self.actions     = [ '' ]
@@ -90,7 +91,7 @@ class PartitionEditor(Window):
         """Load the disk geometry, setup its entry tuples, clamp the selection
         position and update the available actions."""
         self.win.clear()
-        self.tables, self.unused = part.load()
+        self.tables, self.unused, self.zpools = part.load()
         self.tab_entries = list(self.__iterate())
         self.tab_pos     = min(self.tab_pos, len(self.tab_entries)-1)
         self.__set_actions()
@@ -384,6 +385,9 @@ class PartitionEditor(Window):
     def used_as(self, partition):
         """Get a textual representation of what the partition is being used as,
         or None if it's not being used."""
+        for pool in self.zpools:
+            if partition.name in pool.children:
+                return L('part of zpool: %s') % pool.name
         fstab = self.app.fstab.get(partition.name, None)
         if fstab is not None:
             return 'mountpoint: %s' % fstab['mount']
