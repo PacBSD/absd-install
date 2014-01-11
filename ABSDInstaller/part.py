@@ -128,7 +128,7 @@ def load():
     zpools = []
     zhandle = zfs.zfs.libzfs_init()
     if bool(zhandle):
-        def pool_iter(pool, _):
+        def pool_iter(pool, _): # cannot raise exceptions past the C callback
             obj, err = ZPool.from_handle(zhandle, pool)
             if obj is not None:
                 zpools.append(obj)
