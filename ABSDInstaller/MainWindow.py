@@ -90,6 +90,7 @@ class MainWindow(utils.Window):
         _, action = self.entries[self.current]
         result = action()
         self.app.screen.erase()
+        self.resize()
         self.app.screen.refresh()
         return result
 
