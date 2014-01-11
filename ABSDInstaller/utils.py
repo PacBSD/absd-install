@@ -582,14 +582,16 @@ class Dialog(Window):
 # Subwindow
 class List(object):
     """List object subwindow. Handles scrolling/navigating/rendering a list."""
-    def __init__(self, owner, size, entries, name=None):
-        self.win = owner.win.derwin(0, 0)
+    def __init__(self, owner, at=(1,1), entries=[], name=None, userdata=None):
+        self.owner     = owner
+        self.win       = owner.win.derwin(at[0], at[1])
 
-        self.pos      = 0
-        self.scroll   = 0
-        self.size     = size
-        self.name     = name
-        self.userdata = None
+        self.pos       = 0
+        self.scroll    = 0
+        self.name      = name
+        self.userdata  = userdata
+        self.border    = True
+        self.__size    = (0, 0)
         self.__entries = entries
 
     @property
@@ -604,9 +606,15 @@ class List(object):
         self.__entries = value
         self.pos = min(self.pos, len(value)-1)
 
-    def resize(self, size):
+    @property
+    def size(self):
+        """Get the current size."""
+        return self.__size
+
+    @size.setter
+    def size(self, size):
         """Resize the window and underlying curses subwindow."""
-        self.size = size
+        self.__size = size
         self.win.resize(size[0], size[1])
 
     def event(self, key, name):
@@ -633,10 +641,10 @@ class List(object):
             self.scroll = max(self.scroll-1, 0)
 
         elif isk_pagedown(key, name):
-            if self.pos != self.scroll + self.size[0] - 3:
-                self.pos = self.scroll + self.size[0] - 3
+            if self.pos != self.scroll + self.__size[0] - 4:
+                self.pos = self.scroll + self.__size[0] - 4
             else:
-                self.pos += self.size[0]-3
+                self.pos += self.__size[0]-4
 
             self.pos = min(maxpos, max(0, self.pos))
 
@@ -644,7 +652,7 @@ class List(object):
             if self.pos != self.scroll:
                 self.pos = self.scroll
             else:
-                self.pos -= self.size[0]-3
+                self.pos -= self.__size[0]-4
             self.pos = min(maxpos, max(0, self.pos))
 
         else:
@@ -663,17 +671,17 @@ class List(object):
 
     def draw(self):
         """Draw the list including borders, scrollability markers, etc."""
-        height, width = self.size
+        height, width = self.__size
         win = self.win
 
         win.clear()
 
-        rectangle(win, 0, 0, height-1, width-1)
+        rectangle(win, 0, 0, height-2, width-1)
         if self.name is not None:
             win.addstr(0, 3, '[%s]' % self.name)
 
         # -2 for the rectangle borders
-        height -= 2
+        height -= 3
 
         if self.pos < self.scroll:
             self.scroll = self.pos
@@ -695,7 +703,7 @@ class List(object):
                 break
             ent, edata = self.__entries[i]
             # pylint: disable=star-args
-            txt = ent.entry_text(self, self.userdata, width, *edata)
+            txt = ent.entry_text(self.owner, self.userdata, width, *edata)
             win.addstr(y, x, txt, highlight_if(eindex == selected))
             eindex += 1
             y      += 1

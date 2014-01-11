@@ -44,10 +44,9 @@ class PartitionEditor(Window):
         self.result = True
         self.flags.append(Window.NO_TAB)
 
-        self.tab_pos     = 0
-        self.tab_scroll  = 0
-        self.tab_entries = []
-        self.tab_longest = 0
+        self.partlist    = utils.List(self, (1, 1))
+        self.partlist.border = False
+        self.partlist.selection_changed = self.__selection_changed
 
         self.tables      = []
         self.unused      = []
@@ -67,39 +66,40 @@ class PartitionEditor(Window):
         self.width  = self.app.size[1] - 1
         self.win.resize(*self.app.size)
         self.win.mvwin(0, 0)
+        self.partlist.size = (self.height - 2, self.width-1)
 
     def __iterate(self):
         """Entry generator function"""
         # pylint: disable=invalid-name
-        self.tab_longest = 0
+        tab_longest = 0
         for tab in self.tables:
-            self.tab_longest = max(self.tab_longest, len(tab.name))
+            tab_longest = max(tab_longest, len(tab.name))
             yield (TableActions, (tab,))
             at = tab.first
             for p in tab.partitions:
                 if p.start > at:
                     yield (FreeActions, (tab, at, p.start - at))
-                self.tab_longest = max(self.tab_longest, len(p.name))
+                tab_longest = max(tab_longest, len(p.name))
                 yield (PartitionActions, (tab, p))
                 at = p.end + 1
             if at < tab.last:
                 yield (FreeActions, (tab, at, tab.last - at))
         for u in self.unused:
             yield (DiskActions, (u,))
+        self.partlist.userdata = tab_longest
 
     def __load(self):
         """Load the disk geometry, setup its entry tuples, clamp the selection
         position and update the available actions."""
         self.win.clear()
         self.tables, self.unused, self.zpools = part.load()
-        self.tab_entries = list(self.__iterate())
-        self.tab_pos     = min(self.tab_pos, len(self.tab_entries)-1)
+        self.partlist.entries = list(self.__iterate())
         self.__set_actions()
 
     def __set_actions(self):
         """Pull the current entry's actions into self.actions and set act_pos
         to point to their default action."""
-        ent = self.tab_entries[self.tab_pos]
+        ent = self.partlist.entry()
         self.act_pos = ent[0].default
         self.actions = ent[0].actions
 
@@ -126,49 +126,18 @@ class PartitionEditor(Window):
 
     def event(self, key, name):
         # pylint: disable=too-many-branches
-        maxpos = len(self.tab_entries)-1
         if name == b'q':
             return False
-        elif utils.isk_down(key, name):
-            # Down
-            self.tab_pos = min(self.tab_pos+1, maxpos)
-            self.__selection_changed()
-        elif utils.isk_up(key, name):
-            # Up
-            self.tab_pos = max(self.tab_pos-1, 0)
-            self.__selection_changed()
-        elif utils.isk_home(key, name):
-            # Top:
-            self.tab_pos = 0
-            self.__selection_changed()
-        elif utils.isk_end(key, name):
-            # Bottom:
-            self.tab_pos = maxpos
-            self.__selection_changed()
-        elif utils.isk_scrolldown(key, name):
-            # scroll down
-            self.tab_scroll = min(self.tab_scroll+1, maxpos)
-            self.__selection_changed()
-        elif utils.isk_scrollup(key, name):
-            # scroll up
-            self.tab_scroll = max(self.tab_scroll-1, 0)
-            self.__selection_changed()
-        elif utils.isk_pagedown(key, name):
-            # page down
-            if self.tab_pos != self.tab_scroll + self.height - 3:
-                self.tab_pos = self.tab_scroll + self.height - 3
-            else:
-                self.tab_pos += self.height-3
-            self.tab_pos = min(maxpos, max(0, self.tab_pos))
-            self.__selection_changed()
-        elif utils.isk_pageup(key, name):
-            # page up
-            if self.tab_pos != self.tab_scroll:
-                self.tab_pos = self.tab_scroll
-            else:
-                self.tab_pos -= self.height-3
-            self.tab_pos = min(maxpos, max(0, self.tab_pos))
-            self.__selection_changed()
+        elif (utils.isk_down      (key, name) or
+              utils.isk_up        (key, name) or
+              utils.isk_home      (key, name) or
+              utils.isk_end       (key, name) or
+              utils.isk_scrolldown(key, name) or
+              utils.isk_scrollup  (key, name) or
+              utils.isk_pagedown  (key, name) or
+              utils.isk_pageup    (key, name)
+             ):
+            self.partlist.event(key, name)
         elif utils.isk_tab(key, name) or utils.isk_right(key, name):
             # tab/right: select next action
             self.__select_action(1, wrap=utils.isk_tab(key, name))
@@ -188,51 +157,24 @@ class PartitionEditor(Window):
 
         win.clear()
 
-        count  = len(self.tab_entries)
+        count  = len(self.partlist.entries)
 
         rectangle(win, 0, 0, height-1, width)
         win.addstr(0, 3, '[%s]' % L('Partition Editor'))
+        self.partlist.draw()
 
         # -2 for the rectangle borders
-        height -= 2
+        height -= 3
 
         # -1 for the action line
-        act_line = height
-        height -= 1
-        win.hline(height,     1, curses.ACS_HLINE, width-1)
-        win.addch(height,     0, curses.ACS_LTEE)
-        win.addch(height, width, curses.ACS_RTEE)
-        # -1 for the action line's border
-        height -= 1
-
-        if self.tab_pos < self.tab_scroll:
-            self.tab_scroll = self.tab_pos
-        elif self.tab_scroll < self.tab_pos - height + 1:
-            self.tab_scroll =  self.tab_pos - height + 1
-
-        if self.tab_scroll > 0:
-            win.addstr(0,        width - 16, utils.MORE_UP)
-        if self.tab_scroll + height < count:
-            win.addstr(height+1, width - 16, utils.MORE_DOWN)
-
-        # pylint: disable=invalid-name
-        x = 1
-        y = 1
-        eindex   = 0
-        selected = self.tab_pos - self.tab_scroll
-        for i in range(self.tab_scroll, count):
-            if y > height:
-                break
-            ent, edata = self.tab_entries[i]
-            # pylint: disable=star-args
-            txt = ent.entry_text(self, self.tab_longest+2, width, *edata)
-            win.addstr(y, x, txt, utils.highlight_if(eindex == selected))
-            eindex += 1
-            y      += 1
+        win.addch(height,       0, curses.ACS_LTEE)
+        win.addch(height,   width, curses.ACS_RTEE)
+        win.addch(height,       1, curses.ACS_BTEE)
+        win.addch(height, width-1, curses.ACS_BTEE)
 
         # show the action line...
         x = 2
-        y = act_line
+        y = height+1
         for i in range(len(self.actions)):
             a = self.actions[i][1]
             win.addstr(y, x, a, utils.highlight_if(i == self.act_pos))
@@ -244,7 +186,7 @@ class PartitionEditor(Window):
         if self.act_pos is None:
             return
 
-        entry, data = self.tab_entries[self.tab_pos]
+        entry, data = self.partlist.entry()
         method  = entry.actions[self.act_pos][0]
         func    = getattr(self, method)
         # pylint: disable=star-args
