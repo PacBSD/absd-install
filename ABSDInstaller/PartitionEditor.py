@@ -23,25 +23,23 @@ class Entry(object):
     #def entry_text(parted, maxlen, win_width, data):
 
 # pylint: disable=invalid-name
-TableActions     = Entry([('act_table_destroy', L("Destroy Partition Table")),
-                          ('act_table_boot',    L("Choose Bootcode"))])
-PartitionActions = Entry([('act_part_use',      L("Use")),
-                          ('act_part_unuse',    L("Don't use")),
-                          ('act_part_delete',   L("Delete Partition")),
-                          ('act_part_boot',     L("Choose Bootcode")),
+TableActions     = Entry([('__table_destroy', L("Destroy Partition Table")),
+                          ('__table_boot',    L("Choose Bootcode"))])
+PartitionActions = Entry([('__part_use',      L("Use")),
+                          ('__part_unuse',    L("Don't use")),
+                          ('__part_delete',   L("Delete Partition")),
+                          ('__part_boot',     L("Choose Bootcode")),
                          ])
-FreeActions      = Entry([('act_create_part',   L("Create Partition"))])
-DiskActions      = Entry([('act_disk_setup',    L("Setup Partition Table"))])
+FreeActions      = Entry([('__part_create',   L("Create Partition"))])
+DiskActions      = Entry([('__disk_setup',    L("Setup Partition Table"))])
 # pylint: enable=invalid-name
 
 Window = utils.Window
 class PartitionEditor(Window):
     """Partition editor window class."""
-    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, app):
         Window.__init__(self, app)
-        self.result = True
         self.flags.append(Window.NO_TAB)
 
         self.partlist    = utils.List(self, (1, 1))
@@ -55,37 +53,32 @@ class PartitionEditor(Window):
         self.act_pos     = None
         self.actions     = [ '' ]
 
-        self.width       = 0
-        self.height      = 0
-
         self.__load()
         self.resize()
 
     def resize(self):
-        self.height = self.app.size[0] - 1
-        self.width  = self.app.size[1] - 1
+        self.size = (self.app.size[0] - 1, self.app.size[1]-1)
         self.win.resize(*self.app.size)
         self.win.mvwin(0, 0)
-        self.partlist.size = (self.height - 2, self.width-1)
+        self.partlist.size = (self.size[0] - 2, self.size[1]-1)
 
     def __iterate(self):
         """Entry generator function"""
-        # pylint: disable=invalid-name
         tab_longest = 0
         for tab in self.tables:
             tab_longest = max(tab_longest, len(tab.name))
             yield (TableActions, (tab,))
-            at = tab.first
-            for p in tab.partitions:
-                if p.start > at:
-                    yield (FreeActions, (tab, at, p.start - at))
-                tab_longest = max(tab_longest, len(p.name))
-                yield (PartitionActions, (tab, p))
-                at = p.end + 1
-            if at < tab.last:
-                yield (FreeActions, (tab, at, tab.last - at))
-        for u in self.unused:
-            yield (DiskActions, (u,))
+            sector = tab.first
+            for par in tab.partitions:
+                if par.start > sector:
+                    yield (FreeActions, (tab, sector, par.start - sector))
+                tab_longest = max(tab_longest, len(par.name))
+                yield (PartitionActions, (tab, par))
+                sector = par.end + 1
+            if sector < tab.last:
+                yield (FreeActions, (tab, sector, tab.last - sector))
+        for unused in self.unused:
+            yield (DiskActions, (unused,))
         self.partlist.userdata = tab_longest
 
     def __load(self):
@@ -125,7 +118,6 @@ class PartitionEditor(Window):
         self.draw()
 
     def event(self, key, name):
-        # pylint: disable=too-many-branches
         if name == b'q':
             return False
         elif (utils.isk_down      (key, name) or
@@ -150,35 +142,35 @@ class PartitionEditor(Window):
 
     @utils.drawmethod
     def draw(self):
-        # pylint: disable=too-many-locals
-        width  = self.width
-        height = self.height
+        height, width = self.size
         win    = self.win
 
         win.clear()
-
-        count  = len(self.partlist.entries)
 
         rectangle(win, 0, 0, height-1, width)
         win.addstr(0, 3, '[%s]' % L('Partition Editor'))
         self.partlist.draw()
 
-        # -2 for the rectangle borders
         height -= 3
 
-        # -1 for the action line
+        # pylint: disable=no-member
+        #  it doesn't seem to get the ACS_* constants in curses
         win.addch(height,       0, curses.ACS_LTEE)
         win.addch(height,   width, curses.ACS_RTEE)
         win.addch(height,       1, curses.ACS_BTEE)
         win.addch(height, width-1, curses.ACS_BTEE)
+        # pylint: enable=no-member
 
-        # show the action line...
+        # Show the current actions:
+
+        # x and y: pylint: disable=invalid-name
         x = 2
         y = height+1
         for i in range(len(self.actions)):
-            a = self.actions[i][1]
-            win.addstr(y, x, a, utils.highlight_if(i == self.act_pos))
-            x += len(a) + 2
+            action = self.actions[i][1]
+            win.addstr(y, x, action, utils.highlight_if(i == self.act_pos))
+            x += len(action) + 2
+        # pylint: enable=invalid-name
 
     def __action(self):
         """Perform the selected action if any."""
@@ -193,7 +185,7 @@ class PartitionEditor(Window):
         func(*data)
         self.draw()
 
-    def act_table_destroy(self, table):
+    def __table_destroy(self, table):
         """Destroy a partition table: equivalent of gpart destroy"""
         text = ((L("Do you want to destroy %s?\n") % table.name)
                + L("WARNING: THIS OPERATION CANNOT BE UNDONE!")
@@ -206,6 +198,7 @@ class PartitionEditor(Window):
                 self.__load()
 
     def __act_bootcode(self, name, suggested):
+        """Declare a bootcode to be written to a disk or partition."""
         with utils.Dialog(self.app, L('Set bootcode for %s') % name,
                           [('Bootcode', str, suggested, None)]
                          ) as dlg:
@@ -218,12 +211,12 @@ class PartitionEditor(Window):
                 code = None
             self.__set_bootcode(name, code)
 
-    def act_table_boot(self, table):
+    def __table_boot(self, table):
         """Set a disk's bootcode"""
         code = self.suggest_disk_bootcode(table)
         return self.__act_bootcode(table.name, code)
 
-    def act_disk_setup(self, provider):
+    def __disk_setup(self, provider):
         """Create a partition table: equivalent of gpart create"""
         with utils.Dialog(self.app, L('New Partition Table'),
                           [('scheme', str, 'GPT', None)]) as dlg:
@@ -237,7 +230,7 @@ class PartitionEditor(Window):
             else:
                 self.__load()
 
-    def act_create_part(self, table, start, size):
+    def __part_create(self, table, start, size):
         """Create a partition: equivalent of gpart add"""
         minsz  = table.sectorsize
         start *= table.sectorsize
@@ -266,7 +259,7 @@ class PartitionEditor(Window):
             else:
                 self.__load()
 
-    def act_part_delete(self, _, partition):
+    def __part_delete(self, _, partition):
         """Delete a partition: equivalent of gpart delete"""
         text = ((L("Do you want to delete partition %s?\n") % partition.name)
                + L("WARNING: THIS OPERATION CANNOT BE UNDONE!")
@@ -278,7 +271,7 @@ class PartitionEditor(Window):
             else:
                 self.__load()
 
-    def act_part_use(self, _, partition):
+    def __part_use(self, _, partition):
         """Set a partition's mount point"""
         point = self.suggest_mountpoint(partition)
         with utils.Dialog(self.app, L('Use Partition %s') % partition.name,
@@ -291,12 +284,12 @@ class PartitionEditor(Window):
 
             self.__set_mountpoint(partition, result[0][2])
 
-    def act_part_boot(self, _, partition):
+    def __part_boot(self, _, partition):
         """Set a partition's bootcode"""
         code = self.suggest_part_bootcode(partition)
         return self.__act_bootcode(partition.name, code)
 
-    def act_part_unuse(self, _, partition):
+    def __part_unuse(self, _, partition):
         """Ask for confirmation and then calls unuse() on the selected
         partition so it is not used as mountpoint in fstab, and not used
         to install bootcode to."""
@@ -360,7 +353,8 @@ class PartitionEditor(Window):
             'mount': point
         }
 
-    def suggest_disk_bootcode(self, table):
+    @staticmethod
+    def suggest_disk_bootcode(table):
         """Suggest a bootcode file for a disk with a partition table."""
         bclist = {
             'GPT': '/boot/pmbr',
@@ -369,7 +363,8 @@ class PartitionEditor(Window):
         }
         return bclist.get(table.scheme, None)
 
-    def suggest_part_bootcode(self, partition):
+    @staticmethod
+    def suggest_part_bootcode(partition):
         """Suggest a bootcode file for a partition. Mainly depends on the
         partition table scheme."""
         bclist = {
