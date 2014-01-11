@@ -148,8 +148,9 @@ def load():
                 tables.append(PartitionTable.from_geom(g))
 
         # don't add RAID disks to the unused array
-        cl = mesh.find_class(b'RAID')
-        if cl is not None:
+        for cl in mesh.classes():
+            if not cl.name.startswith('RAID'):
+                continue
             for g in cl.geoms():
                 for c in g.consumers():
                     for p in c.providers():
