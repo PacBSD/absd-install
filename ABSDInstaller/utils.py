@@ -578,3 +578,124 @@ class Dialog(Window):
             # pylint: disable=star-args
             win.move(*cursor)
         win.refresh()
+
+# Subwindow
+class List(object):
+    """List object subwindow. Handles scrolling/navigating/rendering a list."""
+    def __init__(self, owner, size, entries, name=None):
+        self.win = owner.win.derwin(0, 0)
+
+        self.pos      = 0
+        self.scroll   = 0
+        self.size     = size
+        self.name     = name
+        self.userdata = None
+        self.__entries = entries
+
+    @property
+    def entries(self):
+        """get the current __entries"""
+        return self.__entries
+
+    @entries.setter
+    def entries(self, value):
+        """set the current __entries and update the current position in case
+        the number of entries changed."""
+        self.__entries = value
+        self.pos = min(self.pos, len(value)-1)
+
+    def resize(self, size):
+        """Resize the window and underlying curses subwindow."""
+        self.size = size
+        self.win.resize(size[0], size[1])
+
+    def event(self, key, name):
+        """Handle an event. Returns False if the event is not handled by this
+        class."""
+        # pylint: disable=too-many-branches
+        maxpos = len(self.__entries)-1
+        if isk_down(key, name):
+            self.pos = min(self.pos+1, maxpos)
+
+        elif isk_up(key, name):
+            self.pos = max(self.pos-1, 0)
+
+        elif isk_home(key, name):
+            self.pos = 0
+
+        elif isk_end(key, name):
+            self.pos = maxpos
+
+        elif isk_scrolldown(key, name):
+            self.scroll = min(self.scroll+1, maxpos)
+
+        elif isk_scrollup(key, name):
+            self.scroll = max(self.scroll-1, 0)
+
+        elif isk_pagedown(key, name):
+            if self.pos != self.scroll + self.size[0] - 3:
+                self.pos = self.scroll + self.size[0] - 3
+            else:
+                self.pos += self.size[0]-3
+
+            self.pos = min(maxpos, max(0, self.pos))
+
+        elif isk_pageup(key, name):
+            if self.pos != self.scroll:
+                self.pos = self.scroll
+            else:
+                self.pos -= self.size[0]-3
+            self.pos = min(maxpos, max(0, self.pos))
+
+        else:
+            return False
+
+        self.selection_changed()
+        return True
+
+    def selection_changed(self):
+        """callback"""
+        pass
+
+    def entry(self):
+        """shorthand to get the current entry"""
+        return self.__entries[self.pos]
+
+    def draw(self):
+        """Draw the list including borders, scrollability markers, etc."""
+        height, width = self.size
+        win = self.win
+
+        win.clear()
+
+        rectangle(win, 0, 0, height-1, width-1)
+        if self.name is not None:
+            win.addstr(0, 3, '[%s]' % self.name)
+
+        # -2 for the rectangle borders
+        height -= 2
+
+        if self.pos < self.scroll:
+            self.scroll = self.pos
+        elif self.scroll < self.pos - height + 1:
+            self.scroll =  self.pos - height + 1
+
+        if self.scroll > 0:
+            win.addstr(0,        width - 16, MORE_UP)
+        if self.scroll + height < len(self.__entries):
+            win.addstr(height+1, width - 16, MORE_DOWN)
+
+        # pylint: disable=invalid-name
+        x = 1
+        y = 1
+        eindex   = 0
+        selected = self.pos - self.scroll
+        for i in range(self.scroll, len(self.__entries)):
+            if y > height:
+                break
+            ent, edata = self.__entries[i]
+            # pylint: disable=star-args
+            txt = ent.entry_text(self, self.userdata, width, *edata)
+            win.addstr(y, x, txt, highlight_if(eindex == selected))
+            eindex += 1
+            y      += 1
