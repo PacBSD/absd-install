@@ -1,14 +1,28 @@
+"""
+Helper function and classes wrapping geom and zfs code.
+"""
+
+# pylint: disable=too-few-public-methods
+#   The classes here are just informative structures
+
 import string
 from geom import geom, zfs
 from ctypes import byref, POINTER, c_uint
 
+import gettext
+L = gettext.gettext
+
 def find_cfg(gobj, name):
-    for c in gobj.configs():
-        if c.name == name:
-            return c.value
+    """lookup a <config> entry by name"""
+    for cfg in gobj.configs():
+        if cfg.name == name:
+            return cfg.value
     return None
 
 class Partition(object):
+    """Contains all the used information about a partition."""
+    # pylint: disable=too-many-instance-attributes
+    # pylint: disable=too-many-arguments
     def __init__(self, own, name, by, secs, pty, rty, start, end, idx, lbl):
         self.owner      = own
         self.name       = name
@@ -22,19 +36,25 @@ class Partition(object):
         self.label      = lbl
 
     @staticmethod
-    def from_provider(owner, p):
+    def from_provider(owner, provider):
+        """Create a Partition from a geom provider object."""
         return Partition(owner,
-                         p.name,
-                         p.mediasize,
-                         p.sectorsize,
-                         find_cfg(p, 'type'),
-                         find_cfg(p, 'rawtype'),
-                         int(find_cfg(p, 'start')),
-                         int(find_cfg(p, 'end')),
-                         int(find_cfg(p, 'index')),
-                         find_cfg(p, 'label'))
+                         provider.name,
+                         provider.mediasize,
+                         provider.sectorsize,
+                         find_cfg(provider, 'type'),
+                         find_cfg(provider, 'rawtype'),
+                         int(find_cfg(provider, 'start')),
+                         int(find_cfg(provider, 'end')),
+                         int(find_cfg(provider, 'index')),
+                         find_cfg(provider, 'label'))
 
 class PartitionTable(object):
+    """This usually wraps a disk containing a partition table.
+    Keeps around a list of all partitions, and information about the disk's
+    layout, such as size, sector-size, partitioning scheme..."""
+
+    # pylint: disable=too-many-arguments
     def __init__(self, name, scheme, first, last, size, sectorsize):
         self.name       = name
         self.scheme     = scheme
@@ -45,7 +65,8 @@ class PartitionTable(object):
         self.partitions = []
 
     def add(self, part):
-        """sorted insert"""
+        """Insert a partition while keeping the list sorted by physical
+        position."""
         for i in range(0, len(self.partitions)):
             if part.start < self.partitions[i].start:
                 self.partitions.insert(i, part)
@@ -53,36 +74,42 @@ class PartitionTable(object):
         self.partitions.append(part)
 
     @staticmethod
-    def from_geom(g):
+    def from_geom(gobj):
+        """Create a PartitionTable from a 'geom' object."""
         scheme = None
         first  = 0
         last   = 0
         size   = 0
         sector = 0
-        for c in g.configs():
-            if c.name == 'scheme':
-                scheme = c.val
-            elif c.name == 'first':
-                first  = int(c.val)
-            elif c.name == 'last':
-                last   = int(c.val)
-        if bool(g.lg_consumer):
-            c = g.lg_consumer[0]
-            if bool(c.lg_provider):
-                size   = c.lg_provider[0].mediasize
-                sector = c.lg_provider[0].sectorsize
-        table = PartitionTable(g.name, scheme, first, last, size, sector)
-        for p in g.providers():
-            table.add(Partition.from_provider(table, p))
+        for cfg in gobj.configs():
+            if cfg.name == 'scheme':
+                scheme = cfg.val
+            elif cfg.name == 'first':
+                first  = int(cfg.val)
+            elif cfg.name == 'last':
+                last   = int(cfg.val)
+        if bool(gobj.lg_consumer):
+            consumer = gobj.lg_consumer[0]
+            if bool(consumer.lg_provider):
+                size   = consumer.lg_provider[0].mediasize
+                sector = consumer.lg_provider[0].sectorsize
+        table = PartitionTable(gobj.name, scheme, first, last, size, sector)
+        for provider in gobj.providers():
+            table.add(Partition.from_provider(table, provider))
         return table
 
 class ZPool(object):
+    """Represents a zpool, currently only contains name and its children,
+    flattened into a single array."""
     def __init__(self, name, children):
         self.name     = name
         self.children = children
 
     @staticmethod
     def from_handle(zhandle, pool):
+        """Create a ZPool from a libzfs and zpool handle. Parses the pool's
+        config to find its child-devices, and passes the list along to
+        the ZPool ctor."""
         name = zfs.zfs.zpool_get_name(pool)
         if not bool(name):
             return None, L('failed to get zpool name')
@@ -104,6 +131,10 @@ class ZPool(object):
 
     @staticmethod
     def __children(zhandle, pool, nvroot):
+        """Recursively list a zpool's child vdevs given a handle to the
+        libzfs, the zpool, and the current nvlist pointer from the zpool's
+        config."""
+
         child    = POINTER(zfs.nvlist_p)()
         children = c_uint()
         zfs.zfs.nvlist_lookup_nvlist_array(nvroot, b'children',
@@ -120,6 +151,10 @@ class ZPool(object):
         return childlist
 
 def load():
+    """Load the current disk geometry layout and provide a list of partition
+    tables, zpools, and a list of unused devices to be shown in the partition
+    editor."""
+
     tables = []
     used   = []
     unused = []
@@ -128,7 +163,9 @@ def load():
     zpools = []
     zhandle = zfs.zfs.libzfs_init()
     if bool(zhandle):
-        def pool_iter(pool, _): # cannot raise exceptions past the C callback
+        def __pool_iter(pool, _):
+            """C callback: called for each zpool"""
+            # cannot raise exceptions past the C callback
             obj, err = ZPool.from_handle(zhandle, pool)
             if obj is not None:
                 zpools.append(obj)
@@ -136,112 +173,113 @@ def load():
             else:
                 errors.append(err)
             return 0
-        zfs.zfs.zpool_iter(zhandle, zfs.zpool_iter_f(pool_iter), None)
+
+        zfs.zfs.zpool_iter(zhandle, zfs.zpool_iter_f(__pool_iter), None)
         zfs.zfs.libzfs_fini(zhandle)
 
     with geom.Mesh() as mesh:
         # first all the used ones
-        cl = mesh.find_class(b'PART')
-        if cl is not None:
-            for g in cl.geoms():
-                used.append(g.name)
-                tables.append(PartitionTable.from_geom(g))
+        cls = mesh.find_class(b'PART')
+        if cls is not None:
+            for gobj in cls.geoms():
+                used.append(gobj.name)
+                tables.append(PartitionTable.from_geom(gobj))
 
         # don't add RAID disks to the unused array
         # ELI attached devices have the same structural layout
-        for cl in mesh.classes():
-            if (cl.name != 'ELI' and not cl.name.startswith('RAID')):
-                continue
-            for g in cl.geoms():
-                for c in g.consumers():
-                    for p in c.providers():
-                        used.append(p.name)
+        for cls in mesh.classes():
+            load_class_used(cls, used)
 
         # now fill the unused-array
-        for cl in mesh.classes():
-            if cl.name == 'PART':
+        for cls in mesh.classes():
+            if cls.name == 'PART':
                 continue
-            load_class(cl, used, unused)
+            load_class_unused(cls, used, unused)
     return tables, unused, zpools
 
-def load_class(cl, used, unused):
-    for g in cl.geoms():
-        for p in g.providers():
-            if p.name.startswith('cd'):
+def load_class_used(cls, used):
+    """Load all the 'used' parts of a geom class which aren't handled
+    explicitly, like disks and partitions part of a RAID or ELI."""
+    if (cls.name != 'ELI' and not cls.name.startswith('RAID')):
+        return
+    for gobj in cls.geoms():
+        for consumer in gobj.consumers():
+            for provider in consumer.providers():
+                used.append(provider.name)
+
+def load_class_unused(cls, used, unused):
+    """Load unused class members into the unused-array, hard masking things
+    such as 'CDs' and partitions by inspecting the name. Partitions usually
+    have their owner prefixed with a slash in front of them, so this will not
+    add anything containing a slash."""
+    for gobj in cls.geoms():
+        for provider in gobj.providers():
+            name = provider.name
+            if name.startswith('cd'):
                 # hard masking this one -_-
                 continue
-            if '/' in p.name:
+            if '/' in name:
                 # this is a partition...
                 continue
-            if p.name in used:
+            if name in used:
                 continue
-            if next((x for x in unused if x.name == p.name), None) is not None:
+            if next((x for x in unused if x.name == name), None) is not None:
                 continue
-            unused.append(p)
+            unused.append(provider)
 
-def info():
-    with geom.Mesh() as mesh:
-        gpart = mesh.find_class(b'PART')
-        if gpart is None:
-            return None
-        for g in gpart.geoms():
-            print(g.name)
-            for c in g.configs():
-                print('  %s: %s' % (c.name, c.val))
-            for p in g.providers():
-                print('   -> %s' % p.name)
-                for c in p.configs():
-                    print('           %s: %s' % (c.name, c.val))
-
-def bytes2str(b, d=1):
-    suffix = 'b'
+def bytes2str(bytes_, precision=1):
+    """convert an amount of bytes to a nice string with a unit suffix"""
     # gpart uses SI units so... not 1024
-    for s in ['k', 'M', 'G', 'T' ]:
-        if b < 1024:
+    suffix = 'X' # pylint Y U NO UNDERSTAND PYTHON'S SCOPING
+    for suffix in [ 'b', 'k', 'M', 'G', 'T' ]:
+        if bytes_ < 1024:
             break
-        b /= 1024
-        suffix = s
-    return ('%%.%uf%%s' % d) % (b, suffix)
+        bytes_ /= 1024
+    return ('%%.%uf%%s' % precision) % (bytes_, suffix)
 
-str2byte_sufs = {
-    'k': 1024,
-    'M': 1024*1024,
-    'G': 1024*1024*1024,
-    'T': 1024*1024*1024*1024,
-}
-def str2bytes(b, d=1):
-    """This does not floor the result and allows floating point values."""
-    b = str(b)
+def str2bytes(bytestr):
+    """Convert a string with optional unit suffix to a number"""
+    __str2byte_sufs = {
+        'k': 1024,
+        'M': 1024*1024,
+        'G': 1024*1024*1024,
+        'T': 1024*1024*1024*1024,
+    }
+    bytestr = str(bytestr)
     num = ''
     mul = 1
-    for i in range(len(b)):
-        c = b[i]
-        if c == '.' or c in string.digits:
-            num += c
+    for i in range(len(bytestr)):
+        char = bytestr[i]
+        if char == '.' or char in string.digits:
+            num += char
             continue
-        if c == ',':
+        if char == ',':
             continue
-        mul = str2byte_sufs.get(c, 1)
+        mul = __str2byte_sufs.get(char.tolower(), 1)
         break
     return int(num) * mul
 
-def delete_partition(p):
-    res = geom.geom_part_do(p.owner.name, 'delete', [('index', int, p.index)])
+def delete_partition(partition):
+    """Delete the partition associated with a partition object."""
+    owner = partition.owner
+    index = partition.index
+    res = geom.geom_part_do(owner.name, 'delete', [('index', int, index)])
     if res is not None:
         return res
-    p.owner.partitions.remove(p)
+    owner.partitions.remove(partition)
     return None
 
 def create_partition(table, label, start, size, type_):
+    """Create a partition inside the provided partition table."""
     data = []
     if len(label) > 0:
         data.append(('label', str, str(label)))
 
     if len(type_):
-        ty = geom.partition_type_for(table.scheme, type_)
-        if ty is None:
+        known_type = geom.partition_type_for(table.scheme, type_)
+        if known_type is None:
             return 'invalid type: %s' % type_
-        data.append(('type', str, ty))
+        data.append(('type', str, known_type))
 
     start = max(start // table.sectorsize, table.first)
     size  = (size // table.sectorsize) + 1
@@ -255,10 +293,12 @@ def create_partition(table, label, start, size, type_):
     return geom.geom_part_do(table.name, 'add', data)
 
 def create_partition_table(provider, scheme):
+    """Create a partitioning scheme on a geom provider."""
     data = [('scheme', str, scheme)]
     return geom.geom_part_do(provider.name, 'create', data)
 
 def destroy_partition_table(table):
+    """Destroy a partition table."""
     if len(table.partitions):
         return "Disk is not empty, remove partitions first!"
     return geom.geom_part_do(table.name, 'destroy', [])
@@ -267,7 +307,6 @@ __all__ = ['find_cfg',
            'Partition',
            'PartitionTable',
            'load',
-           'info',
            'bytes2str',
            'str2bytes',
            'create_partition',
