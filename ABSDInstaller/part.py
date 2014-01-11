@@ -148,8 +148,9 @@ def load():
                 tables.append(PartitionTable.from_geom(g))
 
         # don't add RAID disks to the unused array
+        # ELI attached devices have the same structural layout
         for cl in mesh.classes():
-            if not cl.name.startswith('RAID'):
+            if (cl.name != 'ELI' and not cl.name.startswith('RAID')):
                 continue
             for g in cl.geoms():
                 for c in g.consumers():
