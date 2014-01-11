@@ -44,7 +44,6 @@ class PartitionEditor(Window):
 
         self.partlist    = utils.List(self, (0, 0))
         self.partlist.name   = L('Partition Editor')
-        self.partlist.border = False
         self.partlist.selection_changed = self.__selection_changed
 
         self.tables      = []
@@ -121,16 +120,8 @@ class PartitionEditor(Window):
     def event(self, key, name):
         if name == b'q':
             return False
-        elif (utils.isk_down      (key, name) or
-              utils.isk_up        (key, name) or
-              utils.isk_home      (key, name) or
-              utils.isk_end       (key, name) or
-              utils.isk_scrolldown(key, name) or
-              utils.isk_scrollup  (key, name) or
-              utils.isk_pagedown  (key, name) or
-              utils.isk_pageup    (key, name)
-             ):
-            self.partlist.event(key, name)
+        elif self.partlist.event(key, name):
+            pass
         elif utils.isk_tab(key, name) or utils.isk_right(key, name):
             # tab/right: select next action
             self.__select_action(1, wrap=utils.isk_tab(key, name))
@@ -216,6 +207,7 @@ class PartitionEditor(Window):
 
     def __disk_setup(self, provider):
         """Create a partition table: equivalent of gpart create"""
+        #schemes = [ 'GPT', 'BSD', 'MBR' ]
         with utils.Dialog(self.app, L('New Partition Table'),
                           [('scheme', str, 'GPT', None)]) as dlg:
             dlg.flags.append(Window.ENTER_ACCEPTS)
