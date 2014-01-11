@@ -42,7 +42,8 @@ class PartitionEditor(Window):
         Window.__init__(self, app)
         self.flags.append(Window.NO_TAB)
 
-        self.partlist    = utils.List(self, (1, 1))
+        self.partlist    = utils.List(self, (0, 0))
+        self.partlist.name   = L('Partition Editor')
         self.partlist.border = False
         self.partlist.selection_changed = self.__selection_changed
 
@@ -57,10 +58,10 @@ class PartitionEditor(Window):
         self.resize()
 
     def resize(self):
-        self.size = (self.app.size[0] - 1, self.app.size[1]-1)
-        self.win.resize(*self.app.size)
+        self.size = (self.app.size[0], self.app.size[1])
+        self.win.resize(*self.size)
         self.win.mvwin(0, 0)
-        self.partlist.size = (self.size[0] - 2, self.size[1]-1)
+        self.partlist.size = (self.size[0] - 1, self.size[1])
 
     def __iterate(self):
         """Entry generator function"""
@@ -147,19 +148,16 @@ class PartitionEditor(Window):
 
         win.clear()
 
-        rectangle(win, 0, 0, height-1, width)
-        win.addstr(0, 3, '[%s]' % L('Partition Editor'))
         self.partlist.draw()
 
         height -= 3
+        width -= 1
 
         # pylint: disable=no-member
         #  it doesn't seem to get the ACS_* constants in curses
+        utils.rectangle(win, height, 0, height+2, width)
         win.addch(height,       0, curses.ACS_LTEE)
         win.addch(height,   width, curses.ACS_RTEE)
-        win.addch(height,       1, curses.ACS_BTEE)
-        win.addch(height, width-1, curses.ACS_BTEE)
-        # pylint: enable=no-member
 
         # Show the current actions:
 

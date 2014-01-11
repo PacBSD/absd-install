@@ -152,6 +152,19 @@ def redraw(func):
         return result
     return inner
 
+def rectangle(win, uly, ulx, lry, lrx):
+    """textpad.rectangle but without moving the cursor to outside the rectangle
+    so that it can be used to put a rectangle onto the entire window without
+    raising that stupid exception caused by its last .addch call..."""
+    win.hline(uly, ulx, curses.ACS_HLINE, lrx - ulx)
+    win.vline(uly, ulx, curses.ACS_VLINE, lry - uly)
+    win.vline(uly, lrx, curses.ACS_VLINE, lry - uly)
+    win.hline(lry, ulx, curses.ACS_HLINE, lrx - ulx)
+    win.addch(uly, ulx, curses.ACS_ULCORNER)
+    win.addch(uly, lrx, curses.ACS_URCORNER)
+    win.addch(lry, ulx, curses.ACS_LLCORNER)
+    win.insch(lry, lrx, curses.ACS_LRCORNER) # INSch!
+
 class Window(object):
     """Window baseclass. Creates a curses window, by default intercepts TAB
     keys, handles input events and declares the default attributes.
