@@ -10,12 +10,12 @@ import atexit
 import curses
 import json
 
+CONFIG_FILE = '/tmp/absd-installer.json'
+
 class Installer(object):
     """Handles saving/reloading of previous settings. Runs the main menu, and
     keeps a yank buffer and some other data around used throughout the UI."""
     def __init__(self):
-        self.home        = os.environ['HOME']
-        self.config_file = self.home + '/absd-installer.json'
         self.yank_buf    = ''
 
         self.fstab    = {}
@@ -24,7 +24,7 @@ class Installer(object):
         self.screen   = None
 
         try:
-            with open(self.config_file, 'r', encoding='utf-8') as cfgfile:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as cfgfile:
                 data = json.load(cfgfile)
                 self.fstab    = data['fstab']
                 self.bootcode = data['bootcode']
@@ -36,12 +36,12 @@ class Installer(object):
 
     def save(self):
         """Brings the current setup into a JSON-serializable form and stores
-        the data in the user's home."""
+        the data in CONFIG_FILE."""
         data = {
             'fstab':    self.fstab,
             'bootcode': self.bootcode,
         }
-        with open(self.config_file, 'w', encoding='utf-8') as cfgfile:
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as cfgfile:
             json.dump(data, cfgfile, sort_keys=True,
                       indent=4, separators=(',', ':'))
             cfgfile.write('\n')
