@@ -102,7 +102,7 @@ class Installer(object):
             raise inst
 
         # at the end do some testing
-        #self.__mount()
+        self.__mount()
 
     def yank_add(self, text):
         """Replaces the yank buffer. Might some day keep a history..."""
@@ -140,8 +140,8 @@ class Installer(object):
         ordered  = []
         for disk in self.fstab:
             # normalize
-            target = os.path.normpath(self.fstab[disk])
-            self.fstab[disk] = target
+            target = os.path.normpath(self.fstab[disk]['mount'])
+            self.fstab[disk]['mount'] = target
 
             # check for dups
             if target in existing:
@@ -152,18 +152,27 @@ class Installer(object):
             # check for sanity and insert, in order
             self.__check_mountpoint(target)
             self.__insert_mountpoint(ordered, target, disk)
+        return ordered
 
     @staticmethod
     def __insert_mountpoint(ordered, target, disk):
         """insert a mountpoint into a mount-ordered list"""
+        if target == '/':
+            #print("  inserting [/]")
+            ordered.insert(0, (target, disk))
+            return
         best_index = 0
-        components = 0
+        components = -1
         for idx in range(0, len(ordered)):
             opath, _ = ordered[idx]
-            count = Installer.__count_common_dirs(opath, target)
+            count, olen, tlen = Installer.__count_common_dirs(opath, target)
+            #print("    common for [%s] and [%s]: %i <%i, %i>" % (target, opath, count, tlen, olen))
             if count > components:
                 best_index = idx
                 components = count
+                if olen < tlen:
+                    best_index += 1
+        #print("  best match for [%s]: %i out of %s" % (target, best_index, ordered))
         ordered.insert(best_index, (target, disk))
 
     @staticmethod
@@ -174,8 +183,8 @@ class Installer(object):
         both = min(len(dirs1), len(dirs2))
         for count in range(0, both):
             if dirs1[count] != dirs2[count]:
-                return count-1
-        return -1
+                return count, len(dirs1), len(dirs2)
+        return both, len(dirs1), len(dirs2)
 
     @staticmethod
     def __split_path(path):
@@ -185,7 +194,7 @@ class Installer(object):
         while True:
             base, dirname = os.path.split(path)
             components.insert(0, dirname)
-            if base == '' or base == '/':
+            if dirname == '':
                 return components
             path = base
 
@@ -198,14 +207,18 @@ class Installer(object):
             raise InstallerException(L('invalid mountpoint (empty string)'))
         if path[0] != '/':
             raise InstallerException(L('invalid mountpoint: %s') % path)
-        if path.find('/../') or path.endswith('/..'):
+        if path.find('/../') != -1 or path.endswith('/..'):
             raise InstallerException(L('illegal path for mountpoint: %s') %
                                      path)
 
     def __mount(self):
         """mount the filesystems specified by self.fstab to
         setup['mountpoint']"""
-        self.data['fstab'] = self.__checked_fstab()
+        fstab = self.__checked_fstab()
+        self.data['fstab'] = fstab
+
+        for path, disk in fstab:
+            print("%s -> %s" % (disk, path))
         raise InstallerException('TODO')
 
 __all__ = ['Installer']
