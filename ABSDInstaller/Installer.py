@@ -56,6 +56,13 @@ class Installer(object):
         """shortcut to access self.setup['bootcode']"""
         return self.setup['bootcode']
 
+    def undone(self, what):
+        lst = self.setup['done']
+        try:
+            lst.remove(what)
+        except ValueError:
+            pass
+
     def save(self):
         """Brings the current setup into a JSON-serializable form and stores
         the data in CONFIG_FILE."""
@@ -254,7 +261,8 @@ class Installer(object):
             Installer.__mount(mounts, disk, '%s/%s' % (root, path))
 
     def pacstrap(self):
-        # can raise OSError
+        # can raise some exceptions, but stores completed operations
+        # so retries are possible...
         """create obligatory directories, mount the fstab entries and install
         the system using pacman"""
 

@@ -293,8 +293,13 @@ class PartitionEditor(Window):
     def __unuse(self, partname):
         """Performs the actual task of making a partition not being used as
         a mountpoint or for bootcode installation."""
-        self.app.bootcode.pop(partname, None)
-        self.app.fstab.pop(partname, None)
+        if partname in self.app.bootcode:
+            del self.app.bootcode.pop[partname]
+            self.app.undone('bootcode')
+        if partname in self.app.fstab:
+            del self.app.fstab[partname]
+            self.app.undone('mount')
+            self.app.undone('paths')
 
     def __delete_partition(self, partition):
         """Perform the actual partition deletion: gpart delete"""
@@ -320,6 +325,7 @@ class PartitionEditor(Window):
     def __set_bootcode(self, name, code):
         """Set a partition's or disk's bootcode"""
         # set then delete, no 'is in' check then required :P (lame I know)
+        self.app.undone('bootcode')
         self.app.bootcode[name] = code
         if code is None:
             del self.app.bootcode[name]
@@ -331,10 +337,13 @@ class PartitionEditor(Window):
             return self.__unuse(partition.name)
 
         if point == '*bootcode':
+            self.app.undone('bootcode')
             code = self.suggest_part_bootcode(partition)
             self.__set_bootcode(partition.name, code)
             return
 
+        self.app.undone('mount')
+        self.app.undone('paths')
         self.app.fstab[partition.name] = {
             'mount': point
         }
