@@ -10,7 +10,14 @@ import atexit
 import curses
 import json
 
+import gettext
+L = gettext.gettext
+
 CONFIG_FILE = '/tmp/absd-installer.json'
+
+class InstallerException(Exception):
+    """used mostly internally"""
+    pass
 
 class Installer(object):
     """Handles saving/reloading of previous settings. Runs the main menu, and
@@ -120,5 +127,80 @@ class Installer(object):
         elif key == curses.KEY_RESIZE:
             self.resize_event()
         return (key, name)
+
+    def __checked_fstab(self):
+        """check the fstab entries for invalid or duplicate ones, when there's
+        a problem, an InstallerException is raised, otherwise a list of tuples
+        is returned sorted in a way that it can be mounted in order."""
+        existing = set()
+        ordered  = []
+        for disk in self.fstab:
+            # normalize
+            target = os.path.normpath(self.fstab[disk])
+            self.fstab[disk] = target
+
+            # check for dups
+            if target in existing:
+                raise InstallerException(L('duplicate fstab entry: %s') %
+                                         target)
+            existing.add(target)
+
+            # check for sanity and insert, in order
+            self.__check_mountpoint(target)
+            self.__insert_mountpoint(ordered, target, disk)
+
+    @staticmethod
+    def __insert_mountpoint(ordered, target, disk):
+        """insert a mountpoint into a mount-ordered list"""
+        best_index = 0
+        components = 0
+        for idx in range(0, len(ordered)):
+            opath, _ = ordered[idx]
+            count = Installer.__count_common_dirs(opath, target)
+            if count > components:
+                best_index = idx
+                components = count
+        ordered.insert(best_index, (target, disk))
+
+    @staticmethod
+    def __count_common_dirs(path1, path2):
+        """count the common directories of path1 and path2"""
+        dirs1 = Installer.__split_path(path1)
+        dirs2 = Installer.__split_path(path2)
+        both = min(len(dirs1), len(dirs2))
+        for count in range(0, both):
+            if dirs1[count] != dirs2[count]:
+                return count-1
+        return -1
+
+    @staticmethod
+    def __split_path(path):
+        """split a path into its components by repeatedly calling
+        os.path.split"""
+        components = []
+        while True:
+            base, dirname = os.path.split(path)
+            components.insert(0, dirname)
+            if base == '' or base == '/':
+                return components
+            path = base
+
+    @staticmethod
+    def __check_mountpoint(path):
+        """check a mountpoint's validity"""
+        if len(path) < 1:
+            # this is actually an internal error as setting a mountpoint
+            # to an empty string should delete it from the dict
+            raise InstallerException(L('invalid mountpoint (empty string)'))
+        if path[0] != '/':
+            raise InstallerException(L('invalid mountpoint: %s') % path)
+        if path.find('/../') or path.endswith('/..'):
+            raise InstallerException(L('illegal path for mountpoint: %s') %
+                                     path)
+
+    def __mount(self):
+        """mount the filesystems specified by self.fstab to
+        setup['mountpoint']"""
+        raise InstallerException('TODO')
 
 __all__ = ['Installer']
