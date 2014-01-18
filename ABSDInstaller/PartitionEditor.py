@@ -3,7 +3,6 @@ ArchBSD Partition Editor UI.
 """
 
 import curses
-from curses.textpad import rectangle
 
 import gettext
 L = gettext.gettext
@@ -39,7 +38,7 @@ class PartitionEditor(Window):
     """Partition editor window class."""
 
     def __init__(self, app):
-        Window.__init__(self, app)
+        Window.__init__(self, app, result=True)
         self.flags.append(Window.NO_TAB)
 
         self.partlist    = utils.List(self, (0, 0))

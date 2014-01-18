@@ -26,9 +26,10 @@ class Installer(object):
         self.size     = (1, 1)
         self.screen   = None
 
-        self.yank_buf    = ''
+        self.yank_buf = ''
 
-        self.setup = {}
+        self.setup    = {}
+        self.data     = {}
 
         try:
             with open(CONFIG_FILE, 'r', encoding='utf-8') as cfgfile:
@@ -99,6 +100,9 @@ class Installer(object):
             # Now that the terminal can actually display text again
             # rethrow the exception
             raise inst
+
+        # at the end do some testing
+        #self.__mount()
 
     def yank_add(self, text):
         """Replaces the yank buffer. Might some day keep a history..."""
@@ -201,6 +205,7 @@ class Installer(object):
     def __mount(self):
         """mount the filesystems specified by self.fstab to
         setup['mountpoint']"""
+        self.data['fstab'] = self.__checked_fstab()
         raise InstallerException('TODO')
 
 __all__ = ['Installer']

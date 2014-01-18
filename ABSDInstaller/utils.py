@@ -174,9 +174,9 @@ class Window(object):
     NO_TAB        = 1
     ENTER_ACCEPTS = 2
 
-    def __init__(self, app, tabcount=0):
+    def __init__(self, app, tabcount=0, result=None):
         self.app      = app
-        self.result   = None
+        self.result   = result
         self.current  = 0
         self.tabcount = tabcount
         self.size     = (5, 5)
