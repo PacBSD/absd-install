@@ -9,6 +9,7 @@ import os
 import atexit
 import curses
 import json
+import subprocess
 
 import gettext
 L = gettext.gettext
@@ -41,6 +42,7 @@ class Installer(object):
         self.setup.setdefault('bootcode',       {})
         self.setup.setdefault('mountpoint',     '/mnt')
         self.setup.setdefault('extra_packages', [])
+        self.setup.setdefault('done',           [])
 
     @property
     def fstab(self):
@@ -100,9 +102,6 @@ class Installer(object):
             # Now that the terminal can actually display text again
             # rethrow the exception
             raise inst
-
-        # at the end do some testing
-        self.__mount()
 
     def yank_add(self, text):
         """Replaces the yank buffer. Might some day keep a history..."""
@@ -211,14 +210,53 @@ class Installer(object):
             raise InstallerException(L('illegal path for mountpoint: %s') %
                                      path)
 
-    def __mount(self):
+    def __prepare_fstab(self):
         """mount the filesystems specified by self.fstab to
         setup['mountpoint']"""
-        fstab = self.__checked_fstab()
+        fstab              = self.__checked_fstab()
         self.data['fstab'] = fstab
 
         for path, disk in fstab:
             print("%s -> %s" % (disk, path))
-        raise InstallerException('TODO')
+
+    def __make_paths(self, root, fstab):
+        for path in ['/var/log',
+                     '/var/lib/pacman',
+                     '/var/cache/pacman/pkg',
+                     '/tmp',
+                     '/proc',
+                     '/dev']:
+            os.makedirs('%s/%s' % (root, path), mode=0o755, exist_ok=True)
+
+        for path, disk in fstab:
+            os.makedirs('%s/%s' % (root, path), mode=0o755, exist_ok=True)
+
+    def pacstrap(self):
+        # can raise OSError
+        """create obligatory directories, mount the fstab entries and install
+        the system using pacman"""
+
+        self.__prepare_fstab()
+
+        root  = self.setup['mountpoint']
+        fstab = self.data['fstab']
+        done  = self.setup['done']
+
+        if 'filesystem' not in done:
+            self.__make_paths(root, fstab)
+            done.append('filesystem')
+
+        pacman = ['pacman', '--root', root]
+
+        if 'sync' not in done:
+            if subprocess.call(pacman + ['-Sy']) != 0:
+                raise InstallerException(L('Failed to sync database.'))
+            done.append('sync')
+
+        if 'packages' not in done:
+            packages = [ '-S', 'base' ] + self.setup['extra_packages']
+            if subprocess.call(pacman + packages) != 0:
+                raise InstallerException(L('Failed to install packages.'))
+            done.append('packages')
 
 __all__ = ['Installer']
