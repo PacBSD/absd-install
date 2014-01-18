@@ -2,7 +2,7 @@
 Experimental ArchBSD Installation UI.
 """
 
-from . import utils, part
+from . import utils
 from .MainWindow import MainWindow
 
 import os
@@ -16,33 +16,39 @@ class Installer(object):
     """Handles saving/reloading of previous settings. Runs the main menu, and
     keeps a yank buffer and some other data around used throughout the UI."""
     def __init__(self):
-        self.yank_buf    = ''
-
-        self.fstab    = {}
-        self.bootcode = {}
         self.size     = (1, 1)
         self.screen   = None
 
+        self.yank_buf    = ''
+
+        self.setup = {}
+
         try:
             with open(CONFIG_FILE, 'r', encoding='utf-8') as cfgfile:
-                data = json.load(cfgfile)
-                self.fstab    = data['fstab']
-                self.bootcode = data['bootcode']
-        except (FileNotFoundError, PermissionError) as inst:
-            print(inst)
-        except ValueError as inst:
-            print("Error in old ~/absd-installer.json file")
-            print(inst)
+                self.setup = json.load(cfgfile)
+        except OSError:
+            pass
+
+        self.setup.setdefault('fstab',          {})
+        self.setup.setdefault('bootcode',       {})
+        self.setup.setdefault('mountpoint',     '/mnt')
+        self.setup.setdefault('extra_packages', [])
+
+    @property
+    def fstab(self):
+        """shortcut to access self.setup['fstab']"""
+        return self.setup['fstab']
+
+    @property
+    def bootcode(self):
+        """shortcut to access self.setup['bootcode']"""
+        return self.setup['bootcode']
 
     def save(self):
         """Brings the current setup into a JSON-serializable form and stores
         the data in CONFIG_FILE."""
-        data = {
-            'fstab':    self.fstab,
-            'bootcode': self.bootcode,
-        }
         with open(CONFIG_FILE, 'w', encoding='utf-8') as cfgfile:
-            json.dump(data, cfgfile, sort_keys=True,
+            json.dump(self.setup, cfgfile, sort_keys=True,
                       indent=4, separators=(',', ':'))
             cfgfile.write('\n')
 
