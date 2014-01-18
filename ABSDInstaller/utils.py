@@ -7,7 +7,6 @@ Some localized strings, and functions for common key mappings.
 
 import curses
 import string
-from curses.textpad import rectangle
 
 import gettext
 L = gettext.gettext
@@ -163,6 +162,7 @@ def rectangle(win, uly, ulx, lry, lrx):
     win.addch(uly, ulx, curses.ACS_ULCORNER)
     win.addch(uly, lrx, curses.ACS_URCORNER)
     win.addch(lry, ulx, curses.ACS_LLCORNER)
+    win.delch(lry, lrx)
     win.insch(lry, lrx, curses.ACS_LRCORNER) # INSch!
 
 class Window(object):
@@ -353,7 +353,7 @@ class MsgBox(Window):
 
         win = self.win
         rectangle(win, 0, 0, height, fullw-1)
-        win.addstr(0, 3, '[%s:]' % self.content[0])
+        win.addstr(0, 3, '[%s]' % self.content[0])
 
         # pylint: disable=invalid-name
         y = 1
