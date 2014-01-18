@@ -168,7 +168,7 @@ class PartitionEditor(Window):
 
         entry, data = self.partlist.entry()
         method  = entry.actions[self.act_pos][0]
-        func    = getattr(self, method)
+        func    = getattr(self, '_PartitionEditor%s' % method)
         # pylint: disable=star-args
         func(*data)
         self.draw()
@@ -292,12 +292,8 @@ class PartitionEditor(Window):
     def __unuse(self, partname):
         """Performs the actual task of making a partition not being used as
         a mountpoint or for bootcode installation."""
-        if self.app.bootcode == partname:
-            self.app.bootcode = ''
-        try:
-            del self.app.fstab[partname]
-        except KeyError:
-            pass
+        self.app.bootcode.pop(partname, None)
+        self.app.fstab.pop(partname, None)
 
     def __delete_partition(self, partition):
         """Perform the actual partition deletion: gpart delete"""
