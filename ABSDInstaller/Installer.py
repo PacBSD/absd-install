@@ -11,6 +11,8 @@ import curses
 import json
 import subprocess
 
+import geom
+
 import gettext
 L = gettext.gettext
 
@@ -157,7 +159,6 @@ class Installer(object):
     def __insert_mountpoint(ordered, target, disk):
         """insert a mountpoint into a mount-ordered list"""
         if target == '/':
-            #print("  inserting [/]")
             ordered.insert(0, (target, disk))
             return
         best_index = 0
@@ -165,13 +166,11 @@ class Installer(object):
         for idx in range(0, len(ordered)):
             opath, _ = ordered[idx]
             count, olen, tlen = Installer.__count_common_dirs(opath, target)
-            #print("    common for [%s] and [%s]: %i <%i, %i>" % (target, opath, count, tlen, olen))
             if count > components:
                 best_index = idx
                 components = count
                 if olen < tlen:
                     best_index += 1
-        #print("  best match for [%s]: %i out of %s" % (target, best_index, ordered))
         ordered.insert(best_index, (target, disk))
 
     @staticmethod
@@ -219,17 +218,40 @@ class Installer(object):
         for path, disk in fstab:
             print("%s -> %s" % (disk, path))
 
-    def __make_paths(self, root, fstab):
+    @staticmethod
+    def __make_paths(root): # , fstab):
+        """Create all the required directories on the target mountpoint."""
         for path in ['/var/log',
                      '/var/lib/pacman',
                      '/var/cache/pacman/pkg',
-                     '/tmp',
-                     '/proc',
-                     '/dev']:
+                     '/tmp']:
             os.makedirs('%s/%s' % (root, path), mode=0o755, exist_ok=True)
 
+        # These are created while mounting
+        #for path, disk in fstab:
+        #    os.makedirs('%s/%s' % (root, path), mode=0o755, exist_ok=True)
+
+    @staticmethod
+    def __mount(mounts, what, where, fstype=None):
+        """Mount a filesystem if not already mounted,
+        after creating its path first."""
+        if where in mounts:
+            return
+        os.makedirs(where, mode=0o755, exist_ok=True)
+        if fstype is not None:
+            subprocess.check_call(['mount', '-t', fstype, what, where])
+        else:
+            subprocess.check_call(['mount', what, where])
+
+    @staticmethod
+    def __mount_paths(root, fstab):
+        """Mount (and if required create) all the future fstab entries."""
+        mounts = [ where for what, where in geom.util.genmounts() ]
+        Installer.__mount(mounts, 'procfs', '%s/proc' % root, fstype='procfs')
+        Installer.__mount(mounts, 'devfs',  '%s/dev'  % root, fstype='devfs')
+
         for path, disk in fstab:
-            os.makedirs('%s/%s' % (root, path), mode=0o755, exist_ok=True)
+            Installer.__mount(mounts, disk, '%s/%s' % (root, path))
 
     def pacstrap(self):
         # can raise OSError
@@ -238,22 +260,36 @@ class Installer(object):
 
         self.__prepare_fstab()
 
-        root  = self.setup['mountpoint']
-        fstab = self.data['fstab']
-        done  = self.setup['done']
+        root   = self.setup['mountpoint']
+        fstab  = self.data['fstab']
+        done   = self.setup['done']
+        pacman = ['pacman', '--noconfirm', '--root', root]
 
-        if 'filesystem' not in done:
-            self.__make_paths(root, fstab)
-            done.append('filesystem')
+        if 'mount' not in done:
+            print(L('Mounting paths...'))
+            self.__mount_paths(root, fstab)
+            done.append('mount')
 
-        pacman = ['pacman', '--root', root]
+        if 'paths' not in done:
+            print(L('Creating paths...'))
+            self.__make_paths(root) #, fstab)
+            done.append('paths')
 
         if 'sync' not in done:
+            print(L('Syncing package database...'))
             if subprocess.call(pacman + ['-Sy']) != 0:
                 raise InstallerException(L('Failed to sync database.'))
             done.append('sync')
 
+        if 'download' not in done:
+            print(L('Downloading packages...'))
+            packages = [ '-Sw', 'base' ] + self.setup['extra_packages']
+            if subprocess.call(pacman + packages) != 0:
+                raise InstallerException(L('Failed to install packages.'))
+            done.append('packages')
+
         if 'packages' not in done:
+            print(L('Installing packages...'))
             packages = [ '-S', 'base' ] + self.setup['extra_packages']
             if subprocess.call(pacman + packages) != 0:
                 raise InstallerException(L('Failed to install packages.'))
