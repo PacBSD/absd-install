@@ -22,19 +22,20 @@ class Entry(object):
     #def entry_text(parted, maxlen, win_width, data):
 
 # pylint: disable=invalid-name
-TableActions     = Entry([('__table_destroy', L("Destroy Partition Table")),
-                          ('__table_boot',    L("Choose Bootcode"))])
-PartitionActions = Entry([('__part_use',      L("Use")),
-                          ('__part_unuse',    L("Don't use")),
-                          ('__part_delete',   L("Delete Partition")),
-                          ('__part_boot',     L("Choose Bootcode")),
+TableActions     = Entry([('table_destroy', L("Destroy Partition Table")),
+                          ('table_boot',    L("Choose Bootcode"))])
+PartitionActions = Entry([('part_use',      L("Use")),
+                          ('part_unuse',    L("Don't use")),
+                          ('part_delete',   L("Delete Partition")),
+                          ('part_boot',     L("Choose Bootcode")),
                          ])
-FreeActions      = Entry([('__part_create',   L("Create Partition"))])
-DiskActions      = Entry([('__disk_setup',    L("Setup Partition Table"))])
+FreeActions      = Entry([('part_create',   L("Create Partition"))])
+DiskActions      = Entry([('disk_setup',    L("Setup Partition Table"))])
 # pylint: enable=invalid-name
 
 Window = utils.Window
 class PartitionEditor(Window):
+    # pylint: disable=too-many-public-methods
     """Partition editor window class."""
 
     def __init__(self, app):
@@ -168,12 +169,12 @@ class PartitionEditor(Window):
 
         entry, data = self.partlist.entry()
         method  = entry.actions[self.act_pos][0]
-        func    = getattr(self, '_PartitionEditor%s' % method)
+        func    = getattr(self, method)
         # pylint: disable=star-args
         func(*data)
         self.draw()
 
-    def __table_destroy(self, table):
+    def table_destroy(self, table):
         """Destroy a partition table: equivalent of gpart destroy"""
         text = ((L("Do you want to destroy %s?\n") % table.name)
                + L("WARNING: THIS OPERATION CANNOT BE UNDONE!")
@@ -199,12 +200,12 @@ class PartitionEditor(Window):
                 code = None
             self.__set_bootcode(name, code)
 
-    def __table_boot(self, table):
+    def table_boot(self, table):
         """Set a disk's bootcode"""
         code = self.suggest_disk_bootcode(table)
         return self.__act_bootcode(table.name, code)
 
-    def __disk_setup(self, provider):
+    def disk_setup(self, provider):
         """Create a partition table: equivalent of gpart create"""
         #schemes = [ 'GPT', 'BSD', 'MBR' ]
         with utils.Dialog(self.app, L('New Partition Table'),
@@ -219,7 +220,7 @@ class PartitionEditor(Window):
             else:
                 self.__load()
 
-    def __part_create(self, table, start, size):
+    def part_create(self, table, start, size):
         """Create a partition: equivalent of gpart add"""
         minsz  = table.sectorsize
         start *= table.sectorsize
@@ -248,7 +249,7 @@ class PartitionEditor(Window):
             else:
                 self.__load()
 
-    def __part_delete(self, _, partition):
+    def part_delete(self, _, partition):
         """Delete a partition: equivalent of gpart delete"""
         text = ((L("Do you want to delete partition %s?\n") % partition.name)
                + L("WARNING: THIS OPERATION CANNOT BE UNDONE!")
@@ -260,7 +261,7 @@ class PartitionEditor(Window):
             else:
                 self.__load()
 
-    def __part_use(self, _, partition):
+    def part_use(self, _, partition):
         """Set a partition's mount point"""
         point = self.suggest_mountpoint(partition)
         with utils.Dialog(self.app, L('Use Partition %s') % partition.name,
@@ -273,12 +274,12 @@ class PartitionEditor(Window):
 
             self.__set_mountpoint(partition, result[0][2])
 
-    def __part_boot(self, _, partition):
+    def part_boot(self, _, partition):
         """Set a partition's bootcode"""
         code = self.suggest_part_bootcode(partition)
         return self.__act_bootcode(partition.name, code)
 
-    def __part_unuse(self, _, partition):
+    def part_unuse(self, _, partition):
         """Ask for confirmation and then calls unuse() on the selected
         partition so it is not used as mountpoint in fstab, and not used
         to install bootcode to."""
